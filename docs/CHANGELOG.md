@@ -1,5 +1,8 @@
 # CHANGELOG
 
+## [#1-3] ARCHITECTURE check unit tests — 2026-04-01
+- 7 unit tests for check_architecture(): full 9 sections pass, file not found fail, missing sections fail, section 7 empty (comments only) fail, section 9 missing fail, section 8 whitespace-only fail, custom required_sections pass
+
 ## [#1-2] CHANGELOG check unit tests — 2026-04-01
 - 8 unit tests for check_changelog(): pass today, pass yesterday, fail too old, fail not found, fail empty, fail no heading, fail empty content, fail no date
 
