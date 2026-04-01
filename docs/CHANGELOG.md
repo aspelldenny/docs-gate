@@ -1,5 +1,8 @@
 # CHANGELOG
 
+## [#1-2] CHANGELOG check unit tests — 2026-04-01
+- 8 unit tests for check_changelog(): pass today, pass yesterday, fail too old, fail not found, fail empty, fail no heading, fail empty content, fail no date
+
 ## [#1-1] Project skeleton + config — 2026-04-01
 - Dependencies: clap 4.x, serde 1.x, toml 0.8.x, regex 1.x, chrono 0.4.x, tempfile 3.x (dev)
 - Module structure: main.rs, config.rs, checks/mod.rs, checks/changelog.rs, checks/architecture.rs, output.rs
