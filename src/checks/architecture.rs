@@ -113,7 +113,9 @@ mod tests {
     fn full_9_sections() -> String {
         let mut s = String::from("# ARCHITECTURE\n\n");
         for i in 1..=9 {
-            s.push_str(&format!("## {i}. Section {i}\n\nContent for section {i}.\n\n"));
+            s.push_str(&format!(
+                "## {i}. Section {i}\n\nContent for section {i}.\n\n"
+            ));
         }
         s
     }
@@ -123,7 +125,11 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         write_arch(dir.path(), &full_9_sections());
         let results = check_architecture(&config_with_dir(dir.path()));
-        assert!(results.iter().all(|r| matches!(r.status, CheckStatus::Pass)));
+        assert!(
+            results
+                .iter()
+                .all(|r| matches!(r.status, CheckStatus::Pass))
+        );
     }
 
     #[test]
@@ -131,7 +137,9 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let results = check_architecture(&config_with_dir(dir.path()));
         assert_eq!(results.len(), 1);
-        assert!(matches!(results[0].status, CheckStatus::Fail(ref s) if s.starts_with("File not found")));
+        assert!(
+            matches!(results[0].status, CheckStatus::Fail(ref s) if s.starts_with("File not found"))
+        );
     }
 
     #[test]
@@ -143,8 +151,13 @@ mod tests {
         }
         write_arch(dir.path(), &content);
         let results = check_architecture(&config_with_dir(dir.path()));
-        let count_result = results.iter().find(|r| r.name == "architecture-section-count").unwrap();
-        assert!(matches!(count_result.status, CheckStatus::Fail(ref s) if s == "Found 5/9 sections"));
+        let count_result = results
+            .iter()
+            .find(|r| r.name == "architecture-section-count")
+            .unwrap();
+        assert!(
+            matches!(count_result.status, CheckStatus::Fail(ref s) if s == "Found 5/9 sections")
+        );
     }
 
     #[test]
@@ -153,14 +166,19 @@ mod tests {
         let mut content = String::from("# ARCH\n\n");
         for i in 1..=9 {
             if i == 7 {
-                content.push_str(&format!("## {i}. Section {i}\n\n<!-- template comment -->\n\n"));
+                content.push_str(&format!(
+                    "## {i}. Section {i}\n\n<!-- template comment -->\n\n"
+                ));
             } else {
                 content.push_str(&format!("## {i}. Section {i}\n\nContent.\n\n"));
             }
         }
         write_arch(dir.path(), &content);
         let results = check_architecture(&config_with_dir(dir.path()));
-        let s7 = results.iter().find(|r| r.name == "architecture-section-7").unwrap();
+        let s7 = results
+            .iter()
+            .find(|r| r.name == "architecture-section-7")
+            .unwrap();
         assert!(matches!(s7.status, CheckStatus::Fail(ref s) if s == "Section 7 empty"));
     }
 
@@ -173,7 +191,10 @@ mod tests {
         }
         write_arch(dir.path(), &content);
         let results = check_architecture(&config_with_dir(dir.path()));
-        let s9 = results.iter().find(|r| r.name == "architecture-section-9").unwrap();
+        let s9 = results
+            .iter()
+            .find(|r| r.name == "architecture-section-9")
+            .unwrap();
         assert!(matches!(s9.status, CheckStatus::Fail(ref s) if s == "Section 9 missing"));
     }
 
@@ -190,7 +211,10 @@ mod tests {
         }
         write_arch(dir.path(), &content);
         let results = check_architecture(&config_with_dir(dir.path()));
-        let s8 = results.iter().find(|r| r.name == "architecture-section-8").unwrap();
+        let s8 = results
+            .iter()
+            .find(|r| r.name == "architecture-section-8")
+            .unwrap();
         assert!(matches!(s8.status, CheckStatus::Fail(ref s) if s == "Section 8 empty"));
     }
 
@@ -209,6 +233,10 @@ mod tests {
             ..Config::default()
         };
         let results = check_architecture(&config);
-        assert!(results.iter().all(|r| matches!(r.status, CheckStatus::Pass)));
+        assert!(
+            results
+                .iter()
+                .all(|r| matches!(r.status, CheckStatus::Pass))
+        );
     }
 }

@@ -2,7 +2,7 @@ use std::io::{BufRead, BufReader, Write};
 use std::process::{Command, Stdio};
 use std::time::Duration;
 
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 fn spawn_server() -> std::process::Child {
     Command::new(env!("CARGO_BIN_EXE_docs-gate"))
@@ -72,13 +72,18 @@ fn setup_valid_docs(dir: &std::path::Path) {
     let docs_dir = dir.join("docs");
     std::fs::create_dir_all(&docs_dir).unwrap();
 
-    let today = chrono::Local::now().date_naive().format("%Y-%m-%d").to_string();
+    let today = chrono::Local::now()
+        .date_naive()
+        .format("%Y-%m-%d")
+        .to_string();
     let changelog = format!("# CHANGELOG\n\n## [v1] Release — {today}\n- Added stuff\n");
     std::fs::write(docs_dir.join("CHANGELOG.md"), changelog).unwrap();
 
     let mut arch = String::from("# ARCHITECTURE\n\n");
     for i in 1..=9 {
-        arch.push_str(&format!("## {i}. Section {i}\n\nContent for section {i}.\n\n"));
+        arch.push_str(&format!(
+            "## {i}. Section {i}\n\nContent for section {i}.\n\n"
+        ));
     }
     std::fs::write(docs_dir.join("ARCHITECTURE.md"), arch).unwrap();
 }
@@ -164,10 +169,7 @@ trait WaitTimeout {
 }
 
 impl WaitTimeout for std::process::Child {
-    fn wait_timeout(
-        &mut self,
-        dur: Duration,
-    ) -> std::io::Result<Option<std::process::ExitStatus>> {
+    fn wait_timeout(&mut self, dur: Duration) -> std::io::Result<Option<std::process::ExitStatus>> {
         let start = std::time::Instant::now();
         loop {
             match self.try_wait()? {
@@ -201,7 +203,9 @@ fn test_mcp_tools_list() {
     session.initialize();
 
     let resp = session.send(&tools_list_request(2));
-    let tools = resp["result"]["tools"].as_array().expect("tools should be array");
+    let tools = resp["result"]["tools"]
+        .as_array()
+        .expect("tools should be array");
     assert_eq!(tools.len(), 4);
 
     let names: Vec<&str> = tools.iter().map(|t| t["name"].as_str().unwrap()).collect();
@@ -221,11 +225,7 @@ fn test_mcp_check_changelog_pass() {
     let mut session = McpSession::start_in_dir(dir.path());
     session.initialize();
 
-    let resp = session.send(&call_tool_request(
-        3,
-        "check_changelog",
-        json!({}),
-    ));
+    let resp = session.send(&call_tool_request(3, "check_changelog", json!({})));
 
     let content = &resp["result"]["content"];
     let text = content[0]["text"].as_str().unwrap();
@@ -243,11 +243,7 @@ fn test_mcp_check_changelog_fail() {
     let mut session = McpSession::start_in_dir(dir.path());
     session.initialize();
 
-    let resp = session.send(&call_tool_request(
-        3,
-        "check_changelog",
-        json!({}),
-    ));
+    let resp = session.send(&call_tool_request(3, "check_changelog", json!({})));
 
     let content = &resp["result"]["content"];
     let text = content[0]["text"].as_str().unwrap();
@@ -265,11 +261,7 @@ fn test_mcp_check_architecture_pass() {
     let mut session = McpSession::start_in_dir(dir.path());
     session.initialize();
 
-    let resp = session.send(&call_tool_request(
-        4,
-        "check_architecture",
-        json!({}),
-    ));
+    let resp = session.send(&call_tool_request(4, "check_architecture", json!({})));
 
     let content = &resp["result"]["content"];
     let text = content[0]["text"].as_str().unwrap();
@@ -312,18 +304,16 @@ fn test_mcp_check_discovery_missing_path() {
     session.initialize();
 
     // Call check_discovery without file_path — should error
-    let resp = session.send(&call_tool_request(
-        6,
-        "check_discovery",
-        json!({}),
-    ));
+    let resp = session.send(&call_tool_request(6, "check_discovery", json!({})));
 
     // Should be an error response (missing required parameter)
     assert!(
         resp.get("error").is_some() || {
             // Or the tool might handle it gracefully with Fail result
             let content = &resp["result"]["content"];
-            content[0]["text"].as_str().map_or(false, |t| t.contains("Fail"))
+            content[0]["text"]
+                .as_str()
+                .map_or(false, |t| t.contains("Fail"))
         },
         "Expected error or Fail for missing file_path: {resp}"
     );
@@ -348,17 +338,17 @@ fn test_mcp_check_all() {
     let mut session = McpSession::start_in_dir(dir.path());
     session.initialize();
 
-    let resp = session.send(&call_tool_request(
-        7,
-        "check_all",
-        json!({}),
-    ));
+    let resp = session.send(&call_tool_request(7, "check_all", json!({})));
 
     let content = &resp["result"]["content"];
     let text = content[0]["text"].as_str().unwrap();
     let results: Vec<Value> = serde_json::from_str(text).unwrap();
     // Should have changelog + architecture + ticket checks
-    assert!(results.len() >= 3, "Expected at least 3 results, got {}", results.len());
+    assert!(
+        results.len() >= 3,
+        "Expected at least 3 results, got {}",
+        results.len()
+    );
 
     session.shutdown();
 }
@@ -376,5 +366,8 @@ fn test_mcp_graceful_shutdown() {
         .child
         .wait_timeout(Duration::from_secs(5))
         .expect("wait_timeout failed");
-    assert!(status.is_some(), "Server should exit after client disconnect");
+    assert!(
+        status.is_some(),
+        "Server should exit after client disconnect"
+    );
 }
