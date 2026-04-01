@@ -28,7 +28,7 @@ Chạy như git hook hoặc standalone. Viết bằng Rust, single binary, zero 
 | Check Discovery Report format | ✅ | 2 |
 | Check phiếu có type classification | ✅ | 2 |
 | MCP server mode | 📋 | 3 |
-| Watch mode (re-check on file change) | 📋 | 3 |
+| Watch mode (re-check on file change) | ✅ | 3 |
 
 ## Target Users
 
@@ -48,5 +48,5 @@ Chạy như git hook hoặc standalone. Viết bằng Rust, single binary, zero 
 
 - Single binary, no runtime dependencies
 - Config optional — sensible defaults work without .docs-gate.toml
-- KHÔNG dùng async (không cần cho file I/O)
+- Async runtime: tokio current_thread (cho watch mode + signal handling, checks vẫn sync)
 - Output phải readable cho cả human và CI/CD parsing

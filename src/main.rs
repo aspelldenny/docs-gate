@@ -1,6 +1,7 @@
 mod checks;
 mod config;
 mod output;
+mod watch;
 
 use std::path::PathBuf;
 use std::process::ExitCode;
@@ -23,6 +24,10 @@ struct Cli {
     #[arg(long)]
     all: bool,
 
+    /// Watch mode: re-run checks on file changes
+    #[arg(long)]
+    watch: bool,
+
     #[command(subcommand)]
     command: Option<Commands>,
 }
@@ -36,9 +41,21 @@ enum Commands {
     },
 }
 
-fn main() -> ExitCode {
+#[tokio::main(flavor = "current_thread")]
+async fn main() -> ExitCode {
     let cli = Cli::parse();
+
+    // --watch + check-discovery is not supported
+    if cli.watch && cli.command.is_some() {
+        eprintln!("Error: Watch mode not supported with check-discovery subcommand");
+        return ExitCode::from(2);
+    }
+
     let config = config::load_config(cli.config.as_deref());
+
+    if cli.watch {
+        return watch::run_watch(&config, cli.all).await;
+    }
 
     let results = match cli.command {
         Some(Commands::CheckDiscovery { ref file }) => checks::discovery::check_discovery(file),

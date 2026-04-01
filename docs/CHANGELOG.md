@@ -1,5 +1,17 @@
 # CHANGELOG
 
+## [#3-1] Async migration + Watch mode — 2026-04-01
+- Migrated main.rs to tokio async runtime (#[tokio::main(flavor = "current_thread")])
+- New module: watch.rs — watch mode with file system monitoring
+- CLI: --watch flag for re-running checks on file changes
+- --watch + --all watches both docs_dir and ticket_dir
+- --watch + check-discovery → error exit 2 (not supported)
+- Debounce 500ms, terminal clear + timestamp before each re-run
+- Ctrl+C → clean exit with last check exit code
+- Dependencies: tokio 1.x (rt, macros, signal, sync, time), notify 8.x, libc 0.2 (dev)
+- 4 new unit tests (watch.rs), 2 new integration tests (watch error + SIGINT)
+- Total: 55 tests (48 unit + 11 integration) — note: libc added to dev-deps for SIGINT test
+
 ## [#2-1] Discovery Report check + Ticket type classification — 2026-04-01
 - New module: checks/discovery.rs — check Discovery Report format (4 required sections)
 - New module: checks/ticket.rs — scan ticket dir for Type declarations

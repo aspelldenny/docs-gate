@@ -9,8 +9,9 @@
 
 ```
 src/
-├── main.rs          — Entry point: CLI arg parsing + orchestration
+├── main.rs          — Entry point: CLI arg parsing + orchestration (async)
 ├── config.rs        — Load .docs-gate.toml, defaults, validation
+├── watch.rs         — Watch mode: file watcher + re-run loop
 ├── checks/
 │   ├── mod.rs       — CheckResult type + run_all_checks() + run_all_checks_extended()
 │   ├── changelog.rs — Check CHANGELOG.md has recent entry
@@ -26,10 +27,14 @@ src/
 
 ```rust
 // main.rs
-fn main() -> ExitCode
-  // Parse CLI args (clap) → load config → run checks → format output → exit
+async fn main() -> ExitCode  // #[tokio::main(flavor = "current_thread")]
+  // Parse CLI args (clap) → load config → route by flags → exit
   // Subcommand: check-discovery <file>
-  // Flag: --all (includes ticket checks)
+  // Flags: --all (includes ticket checks), --watch (watch mode)
+
+// watch.rs
+pub async fn run_watch(config: &Config, extended: bool) -> ExitCode
+  // Run checks, setup notify watcher, debounce 500ms, re-run on changes, Ctrl+C exit
 
 // config.rs
 pub struct Config {
@@ -79,6 +84,13 @@ pub fn exit_code(results: &[CheckResult]) -> ExitCode
 CLI args (clap)
   → load_config(.docs-gate.toml hoặc defaults)
   → Route by command/flags:
+    ├─ --watch + check-discovery → error exit 2
+    ├─ --watch:
+    │   → run_watch(config, extended)
+    │     → Run checks lần đầu
+    │     → Setup notify watcher (docs_dir + ticket_dir nếu --all)
+    │     → Loop: recv event → debounce 500ms → re-run checks
+    │     → Ctrl+C → exit với last check exit code
     ├─ check-discovery <file>:
     │   → check_discovery(file) → format → exit
     ├─ --all:
@@ -130,6 +142,8 @@ Nested `[ticket]` section: flat keys cũ giữ nguyên, keys mới nằm dưới
 | toml | 0.8.x | Parse .docs-gate.toml |
 | regex | 1.x | Parse markdown headings |
 | chrono | 0.4.x | Date parsing cho changelog age check |
+| tokio | 1.x | Async runtime (current_thread) cho watch mode + signal handling |
+| notify | 8.x | Filesystem watcher cho watch mode |
 
 ---
 
@@ -183,6 +197,15 @@ Nested `[ticket]` section: flat keys cũ giữ nguyên, keys mới nằm dưới
 - **Data structure:** Flat struct for existing keys + nested TicketConfig struct for `[ticket]` section
 - **Backward compat:** Flat keys unchanged; `[ticket]` section optional with `#[serde(default)]`
 
+### watch.rs
+- **Algorithm:** Run checks once → setup notify RecommendedWatcher on docs_dir (+ ticket_dir if extended) → event loop with tokio::select! between file events and Ctrl+C signal
+- **Debounce:** 500ms hardcoded. On event recv, sleep 500ms then drain channel before re-running.
+- **Terminal:** Clear screen (`\x1B[2J\x1B[H`) + print `[HH:MM:SS] Running checks...` before each run
+- **Signal handling:** tokio::signal::ctrl_c() for clean exit
+- **Exit code:** Last check run's exit code returned on Ctrl+C
+- **Complexity:** O(1) per event (debounce), O(n) per check run
+- **KHÔNG handle:** Debounce is not configurable. notify watcher errors on ticket_dir are warnings (dir may not exist yet).
+
 ### output.rs
 - **Format:** `✅ PASS: {name}` hoặc `❌ FAIL: {name} — {reason}`
 - **Exit code:** 0 nếu zero Fail, 1 nếu >= 1 Fail. Warn không ảnh hưởng exit code.
@@ -191,11 +214,16 @@ Nested `[ticket]` section: flat keys cũ giữ nguyên, keys mới nằm dưới
 
 ## 8. Runtime Behavior ⛔ BẮT BUỘC
 
-- **Process model:** Foreground, synchronous, single-threaded
+- **Process model:** Foreground, async (tokio current_thread runtime)
 - **Output:** stdout cho results, stderr cho warnings/errors
 - **Exit codes:** 0 = all pass, 1 = any fail, 2 = config/usage error
-- **Startup:** Parse args → load config → run → exit. Không daemon, không watch.
-- **Signal handling:** Không cần (chạy nhanh, < 1 giây)
+- **Default mode:** Parse args → load config → run checks → exit. Nhanh, < 1 giây.
+- **Watch mode (--watch):** Long-running process. Run checks → watch files → re-run on changes → Ctrl+C to exit.
+  - Watcher: notify RecommendedWatcher (cross-platform) on docs_dir, + ticket_dir if --all
+  - Debounce: 500ms hardcoded
+  - Terminal: clear + timestamp before each re-run
+  - Exit code: last check run's exit code
+- **Signal handling:** tokio::signal::ctrl_c() cho watch mode clean exit
 - **File I/O:** Read-only. KHÔNG write bất kỳ file nào.
 
 ---

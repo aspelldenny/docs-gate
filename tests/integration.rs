@@ -196,6 +196,63 @@ fn test_all_flag_includes_ticket_check() {
 }
 
 #[test]
+fn test_watch_with_check_discovery_error() {
+    let output = docs_gate_bin()
+        .arg("--watch")
+        .arg("check-discovery")
+        .arg("some-file.md")
+        .output()
+        .unwrap();
+
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert_eq!(output.status.code(), Some(2));
+    assert!(stderr.contains("Watch mode not supported"));
+}
+
+#[test]
+fn test_watch_sigint_clean_exit() {
+    use std::time::Duration;
+
+    let dir = tempfile::tempdir().unwrap();
+    let changelog = format!(
+        "# CHANGELOG\n\n## [v1] Release — {}\n- Added stuff\n",
+        today_str()
+    );
+    create_fixture(
+        dir.path(),
+        "docs",
+        &[
+            ("CHANGELOG.md", &changelog),
+            ("ARCHITECTURE.md", &full_architecture()),
+        ],
+    );
+
+    let child = std::process::Command::new(env!("CARGO_BIN_EXE_docs-gate"))
+        .current_dir(dir.path())
+        .arg("--watch")
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .unwrap();
+
+    // Give it time to start and run initial checks
+    std::thread::sleep(Duration::from_millis(500));
+
+    // Send SIGINT (Ctrl+C equivalent)
+    unsafe {
+        libc::kill(child.id() as libc::pid_t, libc::SIGINT);
+    }
+
+    let output = child.wait_with_output().unwrap();
+    // Should exit cleanly (exit 0 since checks pass)
+    assert!(
+        output.status.success(),
+        "Expected clean exit after SIGINT, got: {:?}",
+        output.status
+    );
+}
+
+#[test]
 fn test_default_no_ticket_check() {
     let dir = tempfile::tempdir().unwrap();
     let changelog = format!("# CHANGELOG\n\n## [v1] Release — {}\n- Added stuff\n", today_str());
