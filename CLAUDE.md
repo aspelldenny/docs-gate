@@ -42,9 +42,11 @@ Thấy bug ngoài scope → ghi Discovery Report, KHÔNG tự fix.
 4. ✅ Không còn dbg!(), println!() debug, todo!(), unused imports
 5. ✅ CHANGELOG.md đã ghi
 6. ✅ ARCHITECTURE.md đã cập nhật (Docs Gate Tầng 1)
-7. ✅ Discovery Report đã ghi
-8. ✅ Hard Stops đã check
-9. ✅ Commit theo đúng sequence
+7. ✅ PROJECT.md đã cập nhật status (nếu feature/phase hoàn thành)
+8. ✅ CLAUDE.md "Phase hiện tại" đã cập nhật (nếu phase đổi status)
+9. ✅ Discovery Report đã ghi
+10. ✅ Hard Stops đã check
+11. ✅ Commit theo đúng sequence
 ```
 
 ---
