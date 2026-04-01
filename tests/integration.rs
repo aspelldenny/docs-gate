@@ -247,6 +247,7 @@ fn test_watch_with_check_discovery_error() {
     assert!(stderr.contains("Watch mode not supported"));
 }
 
+#[cfg(unix)]
 #[test]
 fn test_watch_sigint_clean_exit() {
     use std::time::Duration;
