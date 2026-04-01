@@ -12,9 +12,11 @@ src/
 ├── main.rs          — Entry point: CLI arg parsing + orchestration
 ├── config.rs        — Load .docs-gate.toml, defaults, validation
 ├── checks/
-│   ├── mod.rs       — CheckResult type + run_all_checks()
+│   ├── mod.rs       — CheckResult type + run_all_checks() + run_all_checks_extended()
 │   ├── changelog.rs — Check CHANGELOG.md has recent entry
-│   └── architecture.rs — Check ARCHITECTURE.md 9 sections + non-empty 7,8,9
+│   ├── architecture.rs — Check ARCHITECTURE.md 9 sections + non-empty 7,8,9
+│   ├── discovery.rs — Check Discovery Report format (4 required sections)
+│   └── ticket.rs    — Check ticket files have valid Type declarations
 └── output.rs        — Format results: human-readable + exit code
 ```
 
@@ -26,6 +28,8 @@ src/
 // main.rs
 fn main() -> ExitCode
   // Parse CLI args (clap) → load config → run checks → format output → exit
+  // Subcommand: check-discovery <file>
+  // Flag: --all (includes ticket checks)
 
 // config.rs
 pub struct Config {
@@ -35,6 +39,12 @@ pub struct Config {
     pub required_sections: usize,   // default: 9
     pub required_non_empty: Vec<usize>, // default: [7, 8, 9]
     pub changelog_max_age_days: u32,    // default: 1
+    pub ticket: TicketConfig,       // nested [ticket] section
+}
+pub struct TicketConfig {
+    pub ticket_dir: PathBuf,        // default: "docs/ticket"
+    pub valid_types: Vec<String>,   // default: ["read-only", "mutating", "destructive"]
+    pub exclude_files: Vec<String>, // default: ["TEMPLATE.md"]
 }
 pub fn load_config(path: Option<&Path>) -> Config
 
@@ -42,6 +52,7 @@ pub fn load_config(path: Option<&Path>) -> Config
 pub enum CheckStatus { Pass, Fail(String), Warn(String) }
 pub struct CheckResult { pub name: String, pub status: CheckStatus }
 pub fn run_all_checks(config: &Config) -> Vec<CheckResult>
+pub fn run_all_checks_extended(config: &Config) -> Vec<CheckResult>
 
 // checks/changelog.rs
 pub fn check_changelog(config: &Config) -> CheckResult
@@ -49,8 +60,14 @@ pub fn check_changelog(config: &Config) -> CheckResult
 // checks/architecture.rs
 pub fn check_architecture(config: &Config) -> Vec<CheckResult>
 
+// checks/discovery.rs
+pub fn check_discovery(file_path: &Path) -> Vec<CheckResult>
+
+// checks/ticket.rs
+pub fn check_tickets(config: &Config) -> Vec<CheckResult>
+
 // output.rs
-pub fn format_results(results: &[CheckResult]) -> String
+pub fn format_results(results: &[CheckResult], verbose: bool) -> String
 pub fn exit_code(results: &[CheckResult]) -> ExitCode
 ```
 
@@ -61,14 +78,24 @@ pub fn exit_code(results: &[CheckResult]) -> ExitCode
 ```
 CLI args (clap)
   → load_config(.docs-gate.toml hoặc defaults)
-  → run_all_checks(config)
-    ├─ check_changelog()
-    │   → Read file → find entries → check date/content
-    └─ check_architecture()
-        → Read file → parse ## headings → count sections
-        → Check sections 7,8,9 not empty
-  → format_results() → stdout
-  → exit_code() → 0 (all pass) hoặc 1 (any fail)
+  → Route by command/flags:
+    ├─ check-discovery <file>:
+    │   → check_discovery(file) → format → exit
+    ├─ --all:
+    │   → run_all_checks_extended(config)
+    │     ├─ check_changelog()
+    │     ├─ check_architecture()
+    │     └─ check_tickets() → scan ticket_dir/*.md, skip exclude_files
+    │   → format → exit
+    └─ (default):
+        → run_all_checks(config)
+          ├─ check_changelog()
+          │   → Read file → find entries → check date/content
+          └─ check_architecture()
+              → Read file → parse ## headings → count sections
+              → Check sections 7,8,9 not empty
+        → format_results() → stdout
+        → exit_code() → 0 (all pass) hoặc 1 (any fail)
 ```
 
 ---
@@ -85,8 +112,12 @@ File: `.docs-gate.toml` (project root, optional)
 | `required_sections` | u32 | `9` | Số sections bắt buộc |
 | `required_non_empty` | Array<u32> | `[7, 8, 9]` | Sections phải có content |
 | `changelog_max_age_days` | u32 | `1` | Changelog entry tối đa bao nhiêu ngày |
+| `[ticket].ticket_dir` | String | `"docs/ticket"` | Thư mục chứa phiếu |
+| `[ticket].valid_types` | Array<String> | `["read-only", "mutating", "destructive"]` | Các type hợp lệ |
+| `[ticket].exclude_files` | Array<String> | `["TEMPLATE.md"]` | Files bỏ qua khi scan |
 
 Không có file config → dùng defaults. Mọi option đều optional.
+Nested `[ticket]` section: flat keys cũ giữ nguyên, keys mới nằm dưới `[ticket]`.
 
 ---
 
@@ -111,6 +142,9 @@ Không có file config → dùng defaults. Mọi option đều optional.
 | Config parse error | Stderr warning, dùng defaults |
 | Invalid regex | Panic (bug, không phải user error) |
 | Section heading parse fail | Skip section, count as missing |
+| Ticket dir không tồn tại | CheckStatus::Warn("Ticket directory not found: {path}") |
+| Ticket file thiếu Type | CheckStatus::Fail("{filename}: missing Type declaration") |
+| Ticket type không hợp lệ | CheckStatus::Fail("{filename}: invalid type '{value}'") |
 
 ---
 
@@ -130,10 +164,24 @@ Không có file config → dùng defaults. Mọi option đều optional.
 - **Complexity:** O(n) single pass
 - **KHÔNG handle:** Nested subsections (### ) — chỉ count top-level ## sections
 
+### discovery.rs
+- **Algorithm:** Read file → find `## Discovery Report` heading → check 4 required `### ` sub-headings → check each has content
+- **Content check:** Between heading and next heading, >= 1 non-empty, non-comment line
+- **Comment detection:** Lines starting with `<!--` ignored
+- **Complexity:** O(n) single pass
+- **KHÔNG handle:** Discovery Report embedded in larger docs with conflicting headings
+
+### ticket.rs
+- **Algorithm:** Read ticket_dir → filter *.md, exclude exclude_files → for each: regex match `\*\*Type:\*\*\s*` `` ` `` `([^` `` ` `` `]+)` → validate against valid_types
+- **Regex:** `\*\*Type:\*\*\s*` followed by backtick-wrapped value
+- **Complexity:** O(n*m) where n = number of files, m = avg file size
+- **KHÔNG handle:** Multiple Type declarations with different values in same file — takes first valid match
+
 ### config.rs
 - **Algorithm:** Check `.docs-gate.toml` exists → parse → merge with defaults
 - **Merge strategy:** Config values override defaults, missing values use defaults
-- **Data structure:** Plain struct, no HashMap
+- **Data structure:** Flat struct for existing keys + nested TicketConfig struct for `[ticket]` section
+- **Backward compat:** Flat keys unchanged; `[ticket]` section optional with `#[serde(default)]`
 
 ### output.rs
 - **Format:** `✅ PASS: {name}` hoặc `❌ FAIL: {name} — {reason}`
@@ -163,6 +211,16 @@ Không có file config → dùng defaults. Mọi option đều optional.
 - **Modules liên quan:** checks/changelog.rs
 - **Vấn đề:** Chỉ detect YYYY-MM-DD. Format khác (ISO 8601 variants) bị miss.
 - **Xử lý hiện tại:** Document rõ. User cần dùng format này.
+
+### Discovery Report heading exact match
+- **Modules liên quan:** checks/discovery.rs
+- **Vấn đề:** Headings phải exact match (bao gồm dấu tiếng Việt). Typo hoặc format khác bị miss.
+- **Xử lý hiện tại:** Document rõ. Format cố định theo CLAUDE.md template.
+
+### Ticket type regex cứng
+- **Modules liên quan:** checks/ticket.rs
+- **Vấn đề:** Chỉ detect `**Type:** \`value\`` format. Markdown bold + backtick. Format khác bị miss.
+- **Xử lý hiện tại:** Document rõ. Đây là format chuẩn trong hệ thống thợ-thầu.
 
 ### Config file location cố định
 - **Modules liên quan:** config.rs
