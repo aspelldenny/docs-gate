@@ -1,5 +1,15 @@
 # CHANGELOG
 
+## [#2-1] Discovery Report check + Ticket type classification — 2026-04-01
+- New module: checks/discovery.rs — check Discovery Report format (4 required sections)
+- New module: checks/ticket.rs — scan ticket dir for Type declarations
+- CLI: `check-discovery <file>` subcommand, `--all` flag for ticket checks
+- Config: nested `[ticket]` section with ticket_dir, valid_types, exclude_files
+- Config backward compatible: flat keys unchanged, new keys under [ticket]
+- run_all_checks_extended() for --all mode, run_all_checks() unchanged
+- 16 new unit tests (7 discovery + 7 ticket + 2 config), 4 new integration tests
+- Total: 49 tests (40 unit + 9 integration)
+
 ## [#1-4] Output formatting + integration tests — 2026-04-01
 - 5 unit tests for output.rs: format verbose/non-verbose, failure output, exit code 0/1
 - 5 integration tests: all pass exit 0, missing changelog exit 1, missing architecture exit 1, verbose shows pass, custom config

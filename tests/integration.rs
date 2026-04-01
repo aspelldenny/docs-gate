@@ -121,3 +121,101 @@ fn test_custom_config() {
 
     assert!(output.status.success(), "Expected exit 0 with custom config");
 }
+
+fn valid_discovery() -> String {
+    String::from(
+        "## Discovery Report\n\
+         ### Assumptions trong phiếu — ĐÚNG:\n\
+         - All correct\n\
+         ### Assumptions trong phiếu — SAI:\n\
+         - Không có\n\
+         ### Edge cases phát hiện thêm:\n\
+         - Không có\n\
+         ### Docs đã cập nhật:\n\
+         - CHANGELOG.md\n",
+    )
+}
+
+#[test]
+fn test_check_discovery_pass() {
+    let dir = tempfile::tempdir().unwrap();
+    let report_path = dir.path().join("report.md");
+    std::fs::write(&report_path, valid_discovery()).unwrap();
+
+    let output = docs_gate_bin()
+        .arg("check-discovery")
+        .arg(&report_path)
+        .output()
+        .unwrap();
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(output.status.success(), "Expected exit 0: {stdout}");
+    assert!(stdout.contains("All checks passed"));
+}
+
+#[test]
+fn test_check_discovery_fail_missing_section() {
+    let dir = tempfile::tempdir().unwrap();
+    let report_path = dir.path().join("report.md");
+    std::fs::write(&report_path, "## Discovery Report\n### Assumptions trong phiếu — ĐÚNG:\n- Yes\n").unwrap();
+
+    let output = docs_gate_bin()
+        .arg("check-discovery")
+        .arg(&report_path)
+        .output()
+        .unwrap();
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(!output.status.success(), "Expected exit 1");
+    assert!(stdout.contains("FAIL"));
+}
+
+#[test]
+fn test_all_flag_includes_ticket_check() {
+    let dir = tempfile::tempdir().unwrap();
+    let changelog = format!("# CHANGELOG\n\n## [v1] Release — {}\n- Added stuff\n", today_str());
+    create_fixture(dir.path(), "docs", &[
+        ("CHANGELOG.md", &changelog),
+        ("ARCHITECTURE.md", &full_architecture()),
+    ]);
+    // Create ticket dir with valid ticket
+    let ticket_dir = dir.path().join("docs").join("ticket");
+    std::fs::create_dir_all(&ticket_dir).unwrap();
+    std::fs::write(ticket_dir.join("PHIEU-1.md"), "# Phiếu\n\n**Type:** `mutating`\n").unwrap();
+
+    let output = docs_gate_bin()
+        .current_dir(dir.path())
+        .arg("--all")
+        .arg("--verbose")
+        .output()
+        .unwrap();
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(output.status.success(), "Expected exit 0: {stdout}");
+    assert!(stdout.contains("ticket"));
+}
+
+#[test]
+fn test_default_no_ticket_check() {
+    let dir = tempfile::tempdir().unwrap();
+    let changelog = format!("# CHANGELOG\n\n## [v1] Release — {}\n- Added stuff\n", today_str());
+    create_fixture(dir.path(), "docs", &[
+        ("CHANGELOG.md", &changelog),
+        ("ARCHITECTURE.md", &full_architecture()),
+    ]);
+    // Create ticket dir with INVALID ticket (no Type)
+    let ticket_dir = dir.path().join("docs").join("ticket");
+    std::fs::create_dir_all(&ticket_dir).unwrap();
+    std::fs::write(ticket_dir.join("BAD.md"), "# No type\n").unwrap();
+
+    let output = docs_gate_bin()
+        .current_dir(dir.path())
+        .arg("--verbose")
+        .output()
+        .unwrap();
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    // Without --all, ticket check should NOT run, so bad ticket doesn't cause failure
+    assert!(output.status.success(), "Expected exit 0 without --all: {stdout}");
+    assert!(!stdout.contains("ticket"));
+}
