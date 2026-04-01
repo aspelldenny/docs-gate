@@ -42,7 +42,7 @@ Chạy như git hook hoặc standalone. Viết bằng Rust, single binary, zero 
 | 1 | MVP CLI: check CHANGELOG + ARCHITECTURE + config | ✅ |
 | 2 | Extended checks: Discovery Report, phiếu format | ✅ |
 | 3 | MCP server + watch mode | ✅ |
-| 4 | Open source release (README, CI/CD, cargo install) | 📋 |
+| 4 | Open source release (README, CI/CD, cargo install) | ✅ |
 
 ## Constraints
 

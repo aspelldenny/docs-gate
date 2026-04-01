@@ -1,5 +1,10 @@
 # docs-gate
 
+<!-- TODO: update badge URLs after repo is public -->
+[![CI](https://github.com/OWNER/docs-gate/actions/workflows/ci.yml/badge.svg)](https://github.com/OWNER/docs-gate/actions/workflows/ci.yml)
+[![Crates.io](https://img.shields.io/crates/v/docs-gate)](https://crates.io/crates/docs-gate)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 CLI tool to check docs compliance before commit. Designed for projects using structured markdown documentation (CHANGELOG.md + ARCHITECTURE.md).
 
 Written in Rust. Single binary, zero runtime dependencies.
@@ -7,6 +12,10 @@ Written in Rust. Single binary, zero runtime dependencies.
 ## Install
 
 ```bash
+# From crates.io (available after publish)
+cargo install docs-gate
+
+# From source
 cargo install --path .
 ```
 
@@ -130,7 +139,26 @@ required_non_empty = [7, 8, 9]   # Sections that must have content (default: [7,
 changelog_max_age_days = 1       # Max age of latest changelog entry in days (default: 1)
 ```
 
+### Ticket Config
+
+Nested `[ticket]` section for ticket type validation (used with `--all` flag):
+
+```toml
+[ticket]
+ticket_dir = "docs/ticket"                          # Directory containing ticket files (default: "docs/ticket")
+valid_types = ["read-only", "mutating", "destructive"]  # Accepted type values (default shown)
+exclude_files = ["TEMPLATE.md"]                      # Files to skip when scanning (default: ["TEMPLATE.md"])
+```
+
 All options are optional. Without a config file, sensible defaults are used.
+
+## Contributing
+
+Contributions welcome! Please:
+1. Fork the repo
+2. Create a feature branch
+3. Run `cargo test && cargo clippy -- -D warnings` before submitting
+4. Open a PR against `main`
 
 ## License
 

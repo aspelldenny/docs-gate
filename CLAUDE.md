@@ -153,3 +153,4 @@ git push origin feat/{phieu-id}-{tên-ngắn}
 Phase 1 (MVP CLI) ✅ HOÀN THÀNH
 Phase 2 (Discovery Report + Ticket Check) ✅ HOÀN THÀNH
 Phase 3 (MCP server + watch mode) ✅ HOÀN THÀNH
+Phase 4 (Open source release) ✅ HOÀN THÀNH

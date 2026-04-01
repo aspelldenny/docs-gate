@@ -1,5 +1,16 @@
 # CHANGELOG
 
+## [#4-1] Open source release — CI/CD, packaging, docs polish — 2026-04-01
+- Cargo.toml: added package metadata (description, license, repository, keywords, categories, readme)
+- LICENSE: MIT license file created
+- CI/CD: .github/workflows/ci.yml — 4 jobs (check, test, build-release, release)
+  - Lint: fmt + clippy on ubuntu
+  - Test: 3 OS matrix (ubuntu, macos, windows)
+  - Build: 4 targets (linux x86_64, macos x86_64/aarch64, windows x86_64)
+  - Release: auto GitHub Release on tag v*
+- README: badges, ticket config section, contributing section, install options
+- NO code changes in src/
+
 ## [#3-3] MCP end-to-end testing + documentation — 2026-04-01
 - 9 new MCP integration tests: initialize, tools/list, 4 tool calls (pass+fail), shutdown
 - README.md: added MCP Server Mode, Watch Mode, Claude Desktop config, Available MCP Tools
