@@ -4,9 +4,7 @@ version = "0.1.0"
 edition = "2024"
 description = "CLI tool to check docs compliance before commit — CHANGELOG, ARCHITECTURE, Discovery Reports"
 license = "MIT"
-repository = "https://github.com/OWNER/docs-gate" # TODO: replace OWNER
-homepage = "https://github.com/OWNER/docs-gate" # TODO: replace OWNER
-keywords = ["documentation", "linting", "changelog", "architecture", "cli"]
+repository = "https://github.com/aspelldenny/docs-gate"homepage = "https://github.com/aspelldenny/docs-gate"keywords = ["documentation", "linting", "changelog", "architecture", "cli"]
 categories = ["command-line-utilities", "development-tools"]
 readme = "README.md"
 

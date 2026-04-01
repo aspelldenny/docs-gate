@@ -1,7 +1,6 @@
 # docs-gate
 
-<!-- TODO: update badge URLs after repo is public -->
-[![CI](https://github.com/OWNER/docs-gate/actions/workflows/ci.yml/badge.svg)](https://github.com/OWNER/docs-gate/actions/workflows/ci.yml)
+[![CI](https://github.com/aspelldenny/docs-gate/actions/workflows/ci.yml/badge.svg)](https://github.com/aspelldenny/docs-gate/actions/workflows/ci.yml)
 [![Crates.io](https://img.shields.io/crates/v/docs-gate)](https://crates.io/crates/docs-gate)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
