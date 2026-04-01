@@ -1,5 +1,13 @@
 # CHANGELOG
 
+## [#3-3] MCP end-to-end testing + documentation — 2026-04-01
+- 9 new MCP integration tests: initialize, tools/list, 4 tool calls (pass+fail), shutdown
+- README.md: added MCP Server Mode, Watch Mode, Claude Desktop config, Available MCP Tools
+- examples/claude_desktop_config.json: ready-to-use Claude Desktop config template
+- Fixed: ServerHandler now properly delegates list_tools/call_tool to tool_router
+- Total: 68 tests (52 unit + 11 CLI integration + 9 MCP integration) — note: count includes 4 server unit tests added in #3-2
+- NO new code in src/ — only tests + docs
+
 ## [#3-2] MCP server skeleton + stdio transport — 2026-04-01
 - New module: mcp/ (mod.rs, server.rs, tools.rs) — MCP server via rmcp SDK
 - CLI: `docs-gate serve` subcommand — starts MCP server on stdio transport

@@ -1,8 +1,14 @@
 use std::path::Path;
 
+use rmcp::handler::server::tool::ToolCallContext;
 use rmcp::handler::server::tool::ToolRouter;
 use rmcp::handler::server::wrapper::{Json, Parameters};
-use rmcp::model::{Implementation, ServerCapabilities, ServerInfo};
+use rmcp::model::{
+    CallToolRequestParam, CallToolResult, Implementation, ListToolsResult, ServerCapabilities,
+    ServerInfo,
+};
+use rmcp::service::RequestContext;
+use rmcp::service::RoleServer;
 use rmcp::{tool, tool_router};
 
 use crate::checks;
@@ -84,7 +90,35 @@ impl rmcp::ServerHandler for DocsGateServer {
             ..Default::default()
         }
     }
+
+    fn list_tools(
+        &self,
+        _request: Option<rmcp::model::PaginatedRequestParam>,
+        _context: RequestContext<RoleServer>,
+    ) -> impl Future<Output = Result<ListToolsResult, rmcp::ErrorData>> + Send + '_ {
+        let tools = self.tool_router.list_all();
+        std::future::ready(Ok(ListToolsResult {
+            tools,
+            next_cursor: None,
+        }))
+    }
+
+    fn call_tool(
+        &self,
+        request: CallToolRequestParam,
+        context: RequestContext<RoleServer>,
+    ) -> impl Future<Output = Result<CallToolResult, rmcp::ErrorData>> + Send + '_ {
+        let tool_context = ToolCallContext::new(self, request, context);
+        async move {
+            self.tool_router
+                .call(tool_context)
+                .await
+                .map_err(|e| rmcp::ErrorData::new(e.code, e.message, e.data))
+        }
+    }
 }
+
+use std::future::Future;
 
 #[cfg(test)]
 mod tests {

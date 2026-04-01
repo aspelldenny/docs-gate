@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "docs-gate": {
+      "command": "docs-gate",
+      "args": ["serve"],
+      "cwd": "/path/to/your/project"
+    }
+  }
+}

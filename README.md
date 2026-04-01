@@ -42,6 +42,65 @@ docs-gate --config path/to/.docs-gate.toml
 | 0 | All checks passed |
 | 1 | One or more checks failed |
 
+### Extended Checks
+
+```bash
+# Run all checks including ticket type validation
+docs-gate --all
+
+# Check a specific file for Discovery Report format
+docs-gate check-discovery path/to/report.md
+```
+
+### Watch Mode
+
+Re-run checks automatically when files change:
+
+```bash
+# Watch docs directory, re-run on changes
+docs-gate --watch
+
+# Watch docs + ticket directory
+docs-gate --watch --all
+```
+
+Press `Ctrl+C` to exit watch mode.
+
+### MCP Server Mode
+
+Start an [MCP](https://modelcontextprotocol.io/) server on stdio transport, allowing AI assistants to run docs checks:
+
+```bash
+docs-gate serve
+```
+
+#### Claude Desktop Configuration
+
+Add to your `claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "docs-gate": {
+      "command": "docs-gate",
+      "args": ["serve"],
+      "cwd": "/path/to/your/project"
+    }
+  }
+}
+```
+
+See `examples/claude_desktop_config.json` for a ready-to-use template.
+
+#### Available MCP Tools
+
+| Tool | Parameters | Description |
+|------|-----------|-------------|
+| `check_changelog` | `docs_dir` (optional) | Check CHANGELOG.md has a recent entry |
+| `check_architecture` | `docs_dir` (optional) | Check ARCHITECTURE.md 9 sections + non-empty 7,8,9 |
+| `check_discovery` | `file_path` (required) | Check Discovery Report format in a file |
+| `check_all` | `docs_dir` (optional) | Run all checks (changelog + architecture + tickets) |
+
 ### Use as git hook
 
 ```bash
