@@ -12,6 +12,10 @@ src/
 ├── main.rs          — Entry point: CLI arg parsing + orchestration (async)
 ├── config.rs        — Load .docs-gate.toml, defaults, validation
 ├── watch.rs         — Watch mode: file watcher + re-run loop
+├── mcp/
+│   ├── mod.rs       — MCP module entry point
+│   ├── server.rs    — DocsGateServer + ServerHandler impl
+│   └── tools.rs     — Tool parameter types + config resolution
 ├── checks/
 │   ├── mod.rs       — CheckResult type + run_all_checks() + run_all_checks_extended()
 │   ├── changelog.rs — Check CHANGELOG.md has recent entry
@@ -35,6 +39,21 @@ async fn main() -> ExitCode  // #[tokio::main(flavor = "current_thread")]
 // watch.rs
 pub async fn run_watch(config: &Config, extended: bool) -> ExitCode
   // Run checks, setup notify watcher, debounce 500ms, re-run on changes, Ctrl+C exit
+
+// mcp/server.rs
+pub struct DocsGateServer { config: Config, tool_router: ToolRouter<Self> }
+impl DocsGateServer { pub fn new(config: Config) -> Self }
+impl ServerHandler for DocsGateServer { fn get_info(&self) -> ServerInfo }
+// Tools (via #[tool_router] + #[tool] macros):
+//   check_changelog(DocsDirParam) -> Json<Vec<CheckResult>>
+//   check_architecture(DocsDirParam) -> Json<Vec<CheckResult>>
+//   check_discovery(FilePathParam) -> Json<Vec<CheckResult>>
+//   check_all(DocsDirParam) -> Json<Vec<CheckResult>>
+
+// mcp/tools.rs
+pub struct DocsDirParam { pub docs_dir: Option<String> }
+pub struct FilePathParam { pub file_path: String }
+pub fn resolve_config(base: &Config, docs_dir: Option<String>) -> Config
 
 // config.rs
 pub struct Config {
@@ -84,7 +103,13 @@ pub fn exit_code(results: &[CheckResult]) -> ExitCode
 CLI args (clap)
   → load_config(.docs-gate.toml hoặc defaults)
   → Route by command/flags:
-    ├─ --watch + check-discovery → error exit 2
+    ├─ --watch + subcommand → error exit 2
+    ├─ serve:
+    │   → DocsGateServer::new(config)
+    │   → server.serve(rmcp::transport::stdio())
+    │   → MCP JSON-RPC loop on stdin/stdout
+    │   → Client calls tool → route to check function → return JSON CheckResult(s)
+    │   → Client disconnect → clean exit
     ├─ --watch:
     │   → run_watch(config, extended)
     │     → Run checks lần đầu
@@ -144,6 +169,9 @@ Nested `[ticket]` section: flat keys cũ giữ nguyên, keys mới nằm dưới
 | chrono | 0.4.x | Date parsing cho changelog age check |
 | tokio | 1.x | Async runtime (current_thread) cho watch mode + signal handling |
 | notify | 8.x | Filesystem watcher cho watch mode |
+| rmcp | 0.8.x | MCP server SDK (features: server, transport-io, macros) |
+| schemars | 1.x | JSON Schema generation cho tool parameters |
+| serde_json | 1.x | JSON serialization cho MCP tool responses |
 
 ---
 
@@ -197,6 +225,15 @@ Nested `[ticket]` section: flat keys cũ giữ nguyên, keys mới nằm dưới
 - **Data structure:** Flat struct for existing keys + nested TicketConfig struct for `[ticket]` section
 - **Backward compat:** Flat keys unchanged; `[ticket]` section optional with `#[serde(default)]`
 
+### mcp/server.rs + mcp/tools.rs
+- **Architecture:** DocsGateServer struct holds Config + ToolRouter. #[tool_router] macro generates routing from tool name to handler method.
+- **Tools:** 4 tools exposed via #[tool] macro. Each tool calls existing sync check functions directly — no logic duplication.
+- **Parameter resolution:** DocsDirParam.docs_dir overrides Config.docs_dir if provided, otherwise uses config default. Config object is cloned per-call, not modified.
+- **Return format:** All tools return Json<Vec<CheckResult>> — rmcp serializes to JSON text content in MCP response.
+- **Transport:** stdio only. stdout = JSON-RPC channel. All logs/errors → stderr.
+- **Lifecycle:** Config loaded once at startup. Server runs until client disconnect.
+- **KHÔNG handle:** Hot-reload config. HTTP/SSE transport. Resources or prompts (tools only).
+
 ### watch.rs
 - **Algorithm:** Run checks once → setup notify RecommendedWatcher on docs_dir (+ ticket_dir if extended) → event loop with tokio::select! between file events and Ctrl+C signal
 - **Debounce:** 500ms hardcoded. On event recv, sleep 500ms then drain channel before re-running.
@@ -223,6 +260,10 @@ Nested `[ticket]` section: flat keys cũ giữ nguyên, keys mới nằm dưới
   - Debounce: 500ms hardcoded
   - Terminal: clear + timestamp before each re-run
   - Exit code: last check run's exit code
+- **Serve mode (serve):** Long-running MCP server on stdio. JSON-RPC on stdin/stdout. Logs on stderr.
+  - Config loaded once at startup, no hot-reload
+  - Server exits when client disconnects
+  - serve + --watch → error exit 2
 - **Signal handling:** tokio::signal::ctrl_c() cho watch mode clean exit
 - **File I/O:** Read-only. KHÔNG write bất kỳ file nào.
 
@@ -254,3 +295,13 @@ Nested `[ticket]` section: flat keys cũ giữ nguyên, keys mới nằm dưới
 - **Modules liên quan:** config.rs
 - **Vấn đề:** Chỉ tìm .docs-gate.toml ở CWD. Không walk up directory tree.
 - **Xử lý hiện tại:** Chấp nhận cho Phase 1. Thêm --config flag nếu cần.
+
+### MCP server stdio only
+- **Modules liên quan:** mcp/server.rs
+- **Vấn đề:** Chỉ hỗ trợ stdio transport. Không SSE, không HTTP.
+- **Xử lý hiện tại:** Đủ cho Claude Desktop/Code integration. Network transport ngoài scope.
+
+### MCP server no config hot-reload
+- **Modules liên quan:** mcp/server.rs
+- **Vấn đề:** Config loaded 1 lần lúc startup. Thay đổi .docs-gate.toml cần restart server.
+- **Xử lý hiện tại:** Chấp nhận. MCP clients sẽ restart server khi cần.

@@ -1,5 +1,16 @@
 # CHANGELOG
 
+## [#3-2] MCP server skeleton + stdio transport — 2026-04-01
+- New module: mcp/ (mod.rs, server.rs, tools.rs) — MCP server via rmcp SDK
+- CLI: `docs-gate serve` subcommand — starts MCP server on stdio transport
+- 4 MCP tools: check_changelog, check_architecture, check_discovery, check_all
+- Tools call existing sync check functions directly — no logic duplication
+- DocsGateServer with ServerHandler impl, tool_router macro for tool routing
+- CheckResult/CheckStatus now derive Serialize + JsonSchema for MCP responses
+- Dependencies: rmcp 0.8.x, schemars 1.x, serde_json 1.x
+- 4 new unit tests (server info, tool router, config resolution)
+- Total: 59 tests (52 unit + 11 integration) — note: serde_json needed for JSON serialization
+
 ## [#3-1] Async migration + Watch mode — 2026-04-01
 - Migrated main.rs to tokio async runtime (#[tokio::main(flavor = "current_thread")])
 - New module: watch.rs — watch mode with file system monitoring

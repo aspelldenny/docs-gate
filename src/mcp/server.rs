@@ -1,0 +1,126 @@
+use std::path::Path;
+
+use rmcp::handler::server::tool::ToolRouter;
+use rmcp::handler::server::wrapper::{Json, Parameters};
+use rmcp::model::{Implementation, ServerCapabilities, ServerInfo};
+use rmcp::{tool, tool_router};
+
+use crate::checks;
+use crate::checks::CheckResult;
+use crate::config::Config;
+
+use super::tools::{self, DocsDirParam, FilePathParam};
+
+#[allow(dead_code)]
+pub struct DocsGateServer {
+    config: Config,
+    tool_router: ToolRouter<Self>,
+}
+
+impl DocsGateServer {
+    pub fn new(config: Config) -> Self {
+        let tool_router = Self::tool_router();
+        Self {
+            config,
+            tool_router,
+        }
+    }
+}
+
+#[tool_router]
+impl DocsGateServer {
+    /// Check CHANGELOG.md has a recent entry
+    #[tool(name = "check_changelog")]
+    fn check_changelog(
+        &self,
+        Parameters(params): Parameters<DocsDirParam>,
+    ) -> Json<Vec<CheckResult>> {
+        let config = tools::resolve_config(&self.config, params.docs_dir);
+        Json(vec![checks::changelog::check_changelog(&config)])
+    }
+
+    /// Check ARCHITECTURE.md has 9 sections with non-empty 7, 8, 9
+    #[tool(name = "check_architecture")]
+    fn check_architecture(
+        &self,
+        Parameters(params): Parameters<DocsDirParam>,
+    ) -> Json<Vec<CheckResult>> {
+        let config = tools::resolve_config(&self.config, params.docs_dir);
+        Json(checks::architecture::check_architecture(&config))
+    }
+
+    /// Check Discovery Report format in a specific file
+    #[tool(name = "check_discovery")]
+    fn check_discovery(
+        &self,
+        Parameters(params): Parameters<FilePathParam>,
+    ) -> Json<Vec<CheckResult>> {
+        let path = Path::new(&params.file_path);
+        Json(checks::discovery::check_discovery(path))
+    }
+
+    /// Run all checks (changelog + architecture + tickets)
+    #[tool(name = "check_all")]
+    fn check_all(
+        &self,
+        Parameters(params): Parameters<DocsDirParam>,
+    ) -> Json<Vec<CheckResult>> {
+        let config = tools::resolve_config(&self.config, params.docs_dir);
+        Json(checks::run_all_checks_extended(&config))
+    }
+}
+
+impl rmcp::ServerHandler for DocsGateServer {
+    fn get_info(&self) -> ServerInfo {
+        ServerInfo {
+            server_info: Implementation {
+                name: env!("CARGO_PKG_NAME").to_string(),
+                title: None,
+                version: env!("CARGO_PKG_VERSION").to_string(),
+                icons: None,
+                website_url: None,
+            },
+            capabilities: ServerCapabilities::builder().enable_tools().build(),
+            ..Default::default()
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_server_info() {
+        let server = DocsGateServer::new(Config::default());
+        let info = rmcp::ServerHandler::get_info(&server);
+        assert_eq!(info.server_info.name, "docs-gate");
+        assert!(!info.server_info.version.is_empty());
+    }
+
+    #[test]
+    fn test_tool_router_has_4_tools() {
+        let server = DocsGateServer::new(Config::default());
+        let tools = server.tool_router.list_all();
+        let names: Vec<String> = tools.iter().map(|t| t.name.to_string()).collect();
+        assert!(names.contains(&"check_changelog".to_string()));
+        assert!(names.contains(&"check_architecture".to_string()));
+        assert!(names.contains(&"check_discovery".to_string()));
+        assert!(names.contains(&"check_all".to_string()));
+        assert_eq!(tools.len(), 4);
+    }
+
+    #[test]
+    fn test_resolve_config_override() {
+        let config = Config::default();
+        let resolved = tools::resolve_config(&config, Some("/custom/docs".to_string()));
+        assert_eq!(resolved.docs_dir, std::path::PathBuf::from("/custom/docs"));
+    }
+
+    #[test]
+    fn test_resolve_config_no_override() {
+        let config = Config::default();
+        let resolved = tools::resolve_config(&config, None);
+        assert_eq!(resolved.docs_dir, config.docs_dir);
+    }
+}

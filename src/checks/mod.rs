@@ -3,16 +3,19 @@ pub mod changelog;
 pub mod discovery;
 pub mod ticket;
 
+use schemars::JsonSchema;
+use serde::Serialize;
+
 use crate::config::Config;
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, JsonSchema)]
 pub enum CheckStatus {
     Pass,
     Fail(String),
     Warn(String),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, JsonSchema)]
 pub struct CheckResult {
     pub name: String,
     pub status: CheckStatus,

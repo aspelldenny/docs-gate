@@ -27,7 +27,7 @@ Chạy như git hook hoặc standalone. Viết bằng Rust, single binary, zero 
 | Human-readable output (pass/fail + lý do) | ✅ | 1 |
 | Check Discovery Report format | ✅ | 2 |
 | Check phiếu có type classification | ✅ | 2 |
-| MCP server mode | 📋 | 3 |
+| MCP server mode | ✅ | 3 |
 | Watch mode (re-check on file change) | ✅ | 3 |
 
 ## Target Users
