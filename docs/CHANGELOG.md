@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## [#1-4] Output formatting + integration tests — 2026-04-01
+- 5 unit tests for output.rs: format verbose/non-verbose, failure output, exit code 0/1
+- 5 integration tests: all pass exit 0, missing changelog exit 1, missing architecture exit 1, verbose shows pass, custom config
+- Total: 29 tests (24 unit + 5 integration)
+
 ## [#1-3] ARCHITECTURE check unit tests — 2026-04-01
 - 7 unit tests for check_architecture(): full 9 sections pass, file not found fail, missing sections fail, section 7 empty (comments only) fail, section 9 missing fail, section 8 whitespace-only fail, custom required_sections pass
 

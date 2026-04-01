@@ -52,3 +52,53 @@ pub fn exit_code(results: &[CheckResult]) -> ExitCode {
         ExitCode::from(0)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn pass_result(name: &str) -> CheckResult {
+        CheckResult { name: String::from(name), status: CheckStatus::Pass }
+    }
+
+    fn fail_result(name: &str, reason: &str) -> CheckResult {
+        CheckResult { name: String::from(name), status: CheckStatus::Fail(String::from(reason)) }
+    }
+
+    #[test]
+    fn test_all_pass_verbose() {
+        let results = vec![pass_result("changelog"), pass_result("architecture")];
+        let output = format_results(&results, true);
+        assert!(output.contains("✅ PASS: changelog"));
+        assert!(output.contains("✅ PASS: architecture"));
+        assert!(output.contains("All checks passed (2/2)"));
+    }
+
+    #[test]
+    fn test_all_pass_non_verbose() {
+        let results = vec![pass_result("changelog"), pass_result("architecture")];
+        let output = format_results(&results, false);
+        assert!(!output.contains("PASS: changelog"));
+        assert!(output.contains("All checks passed (2/2)"));
+    }
+
+    #[test]
+    fn test_with_failure() {
+        let results = vec![pass_result("changelog"), fail_result("architecture", "Section 7 empty")];
+        let output = format_results(&results, false);
+        assert!(output.contains("❌ FAIL: architecture — Section 7 empty"));
+        assert!(output.contains("1 check(s) failed (1/2 passed)"));
+    }
+
+    #[test]
+    fn test_exit_code_pass() {
+        let results = vec![pass_result("a"), pass_result("b")];
+        assert_eq!(exit_code(&results), ExitCode::from(0));
+    }
+
+    #[test]
+    fn test_exit_code_fail() {
+        let results = vec![pass_result("a"), fail_result("b", "broken")];
+        assert_eq!(exit_code(&results), ExitCode::from(1));
+    }
+}
