@@ -35,6 +35,8 @@ Thấy bug ngoài scope → ghi Discovery Report, KHÔNG tự fix.
 
 ## ⛔ DEFINITION OF DONE
 
+**Áp dụng cho mỗi PHIẾU (không phải mỗi subtask):**
+
 ```
 1. ✅ cargo build --release (zero warnings)
 2. ✅ cargo test (all pass)
@@ -46,6 +48,9 @@ Thấy bug ngoài scope → ghi Discovery Report, KHÔNG tự fix.
 8. ✅ Hard Stops đã check
 9. ✅ Commit theo đúng sequence
 ```
+
+**Phiếu lớn (cả phase):** Thợ tự chia subtask bên trong, tự test từng bước.
+Chỉ chạy Definition of Done 1 lần ở cuối phiếu, không cần chạy mỗi subtask.
 
 ---
 
@@ -137,10 +142,11 @@ git push origin feat/{phieu-id}-{tên-ngắn}
 
 ## Gotchas
 
-<!-- Thợ phát hiện → thêm vào đây -->
+- **Glob scan false positive:** Khi scan `*.md` trong directory, luôn xét có file nào KHÔNG phải target (TEMPLATE.md, README.md, etc.) sẽ bị bắt nhầm. Dùng `exclude_files` config.
 
 ---
 
 ## Phase hiện tại
 
-Phase 1 (MVP CLI) ⏳ ĐANG LÀM
+Phase 1 (MVP CLI) ✅ HOÀN THÀNH
+Phase 2 (Discovery Report + Ticket Check) ✅ HOÀN THÀNH

@@ -19,14 +19,14 @@ Chạy như git hook hoặc standalone. Viết bằng Rust, single binary, zero 
 
 | Feature | Status | Phase |
 |---------|--------|-------|
-| Check CHANGELOG.md updated | ⏳ | 1 |
-| Check ARCHITECTURE.md 9 sections | ⏳ | 1 |
-| Check ARCHITECTURE.md Section 7,8,9 not empty | ⏳ | 1 |
-| Per-project config (.docs-gate.toml) | ⏳ | 1 |
-| Exit code 0/1 (dùng làm git hook) | ⏳ | 1 |
-| Human-readable output (pass/fail + lý do) | ⏳ | 1 |
-| Check Discovery Report format | 📋 | 2 |
-| Check phiếu có type classification | 📋 | 2 |
+| Check CHANGELOG.md updated | ✅ | 1 |
+| Check ARCHITECTURE.md 9 sections | ✅ | 1 |
+| Check ARCHITECTURE.md Section 7,8,9 not empty | ✅ | 1 |
+| Per-project config (.docs-gate.toml) | ✅ | 1 |
+| Exit code 0/1 (dùng làm git hook) | ✅ | 1 |
+| Human-readable output (pass/fail + lý do) | ✅ | 1 |
+| Check Discovery Report format | ✅ | 2 |
+| Check phiếu có type classification | ✅ | 2 |
 | MCP server mode | 📋 | 3 |
 | Watch mode (re-check on file change) | 📋 | 3 |
 
@@ -39,8 +39,8 @@ Chạy như git hook hoặc standalone. Viết bằng Rust, single binary, zero 
 
 | Phase | Mục tiêu | Status |
 |-------|----------|--------|
-| 1 | MVP CLI: check CHANGELOG + ARCHITECTURE + config | ⏳ |
-| 2 | Extended checks: Discovery Report, phiếu format | 📋 |
+| 1 | MVP CLI: check CHANGELOG + ARCHITECTURE + config | ✅ |
+| 2 | Extended checks: Discovery Report, phiếu format | ✅ |
 | 3 | MCP server + watch mode | 📋 |
 | 4 | Open source release (README, CI/CD, cargo install) | 📋 |
 
