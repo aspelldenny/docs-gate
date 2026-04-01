@@ -19,10 +19,7 @@ pub fn check_tickets(config: &Config) -> Vec<CheckResult> {
         Err(e) => {
             return vec![CheckResult {
                 name: String::from("ticket"),
-                status: CheckStatus::Fail(format!(
-                    "Cannot read {}: {e}",
-                    ticket_dir.display()
-                )),
+                status: CheckStatus::Fail(format!("Cannot read {}: {e}", ticket_dir.display())),
             }];
         }
     };
@@ -122,10 +119,22 @@ mod tests {
     #[test]
     fn test_pass_all_valid() {
         let dir = tempfile::tempdir().unwrap();
-        write_ticket(dir.path(), "PHIEU-1.md", "# Phiếu 1\n\n**Type:** `mutating`\n");
-        write_ticket(dir.path(), "PHIEU-2.md", "# Phiếu 2\n\n**Type:** `read-only`\n");
+        write_ticket(
+            dir.path(),
+            "PHIEU-1.md",
+            "# Phiếu 1\n\n**Type:** `mutating`\n",
+        );
+        write_ticket(
+            dir.path(),
+            "PHIEU-2.md",
+            "# Phiếu 2\n\n**Type:** `read-only`\n",
+        );
         let results = check_tickets(&config_with_dir(dir.path()));
-        assert!(results.iter().all(|r| matches!(r.status, CheckStatus::Pass)));
+        assert!(
+            results
+                .iter()
+                .all(|r| matches!(r.status, CheckStatus::Pass))
+        );
         assert_eq!(results.len(), 2);
     }
 
@@ -135,16 +144,24 @@ mod tests {
         write_ticket(dir.path(), "PHIEU-1.md", "# Phiếu 1\n\nNo type here\n");
         let results = check_tickets(&config_with_dir(dir.path()));
         assert_eq!(results.len(), 1);
-        assert!(matches!(results[0].status, CheckStatus::Fail(ref s) if s.contains("missing Type")));
+        assert!(
+            matches!(results[0].status, CheckStatus::Fail(ref s) if s.contains("missing Type"))
+        );
     }
 
     #[test]
     fn test_fail_invalid_type() {
         let dir = tempfile::tempdir().unwrap();
-        write_ticket(dir.path(), "PHIEU-1.md", "# Phiếu 1\n\n**Type:** `urgent`\n");
+        write_ticket(
+            dir.path(),
+            "PHIEU-1.md",
+            "# Phiếu 1\n\n**Type:** `urgent`\n",
+        );
         let results = check_tickets(&config_with_dir(dir.path()));
         assert_eq!(results.len(), 1);
-        assert!(matches!(results[0].status, CheckStatus::Fail(ref s) if s.contains("invalid type 'urgent'")));
+        assert!(
+            matches!(results[0].status, CheckStatus::Fail(ref s) if s.contains("invalid type 'urgent'"))
+        );
     }
 
     #[test]
@@ -167,7 +184,11 @@ mod tests {
     fn test_skip_template() {
         let dir = tempfile::tempdir().unwrap();
         write_ticket(dir.path(), "TEMPLATE.md", "# Template\n\nNo type here\n");
-        write_ticket(dir.path(), "PHIEU-1.md", "# Phiếu 1\n\n**Type:** `mutating`\n");
+        write_ticket(
+            dir.path(),
+            "PHIEU-1.md",
+            "# Phiếu 1\n\n**Type:** `mutating`\n",
+        );
         let results = check_tickets(&config_with_dir(dir.path()));
         // TEMPLATE.md skipped, only PHIEU-1.md checked
         assert_eq!(results.len(), 1);
@@ -177,8 +198,16 @@ mod tests {
     #[test]
     fn test_pass_destructive_type() {
         let dir = tempfile::tempdir().unwrap();
-        write_ticket(dir.path(), "PHIEU-1.md", "# Phiếu 1\n\n**Type:** `destructive`\n");
+        write_ticket(
+            dir.path(),
+            "PHIEU-1.md",
+            "# Phiếu 1\n\n**Type:** `destructive`\n",
+        );
         let results = check_tickets(&config_with_dir(dir.path()));
-        assert!(results.iter().all(|r| matches!(r.status, CheckStatus::Pass)));
+        assert!(
+            results
+                .iter()
+                .all(|r| matches!(r.status, CheckStatus::Pass))
+        );
     }
 }

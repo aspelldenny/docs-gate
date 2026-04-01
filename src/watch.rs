@@ -35,19 +35,20 @@ pub async fn run_watch(config: &Config, extended: bool) -> ExitCode {
     // Setup file watcher
     let (tx, mut rx) = mpsc::channel(100);
 
-    let mut watcher = match notify::recommended_watcher(move |res: Result<notify::Event, notify::Error>| {
-        if let Ok(event) = res
-            && (event.kind.is_modify() || event.kind.is_create() || event.kind.is_remove())
-        {
-            let _ = tx.blocking_send(());
-        }
-    }) {
-        Ok(w) => w,
-        Err(e) => {
-            eprintln!("Error: failed to start file watcher: {e}");
-            return ExitCode::from(2);
-        }
-    };
+    let mut watcher =
+        match notify::recommended_watcher(move |res: Result<notify::Event, notify::Error>| {
+            if let Ok(event) = res
+                && (event.kind.is_modify() || event.kind.is_create() || event.kind.is_remove())
+            {
+                let _ = tx.blocking_send(());
+            }
+        }) {
+            Ok(w) => w,
+            Err(e) => {
+                eprintln!("Error: failed to start file watcher: {e}");
+                return ExitCode::from(2);
+            }
+        };
 
     // Watch docs_dir
     if let Err(e) = watcher.watch(&config.docs_dir, RecursiveMode::Recursive) {
@@ -56,10 +57,11 @@ pub async fn run_watch(config: &Config, extended: bool) -> ExitCode {
     }
 
     // Watch ticket_dir if extended
-    if extended
-        && let Err(e) = watcher.watch(&config.ticket.ticket_dir, RecursiveMode::Recursive)
-    {
-        eprintln!("Warning: cannot watch {}: {e}", config.ticket.ticket_dir.display());
+    if extended && let Err(e) = watcher.watch(&config.ticket.ticket_dir, RecursiveMode::Recursive) {
+        eprintln!(
+            "Warning: cannot watch {}: {e}",
+            config.ticket.ticket_dir.display()
+        );
         // Continue — ticket dir might not exist yet
     }
 

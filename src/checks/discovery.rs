@@ -113,7 +113,11 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let path = write_file(dir.path(), "report.md", &valid_discovery());
         let results = check_discovery(&path);
-        assert!(results.iter().all(|r| matches!(r.status, CheckStatus::Pass)));
+        assert!(
+            results
+                .iter()
+                .all(|r| matches!(r.status, CheckStatus::Pass))
+        );
         assert_eq!(results.len(), 4);
     }
 
@@ -121,7 +125,9 @@ mod tests {
     fn test_fail_file_not_found() {
         let results = check_discovery(Path::new("/tmp/nonexistent-discovery.md"));
         assert_eq!(results.len(), 1);
-        assert!(matches!(results[0].status, CheckStatus::Fail(ref s) if s.starts_with("File not found")));
+        assert!(
+            matches!(results[0].status, CheckStatus::Fail(ref s) if s.starts_with("File not found"))
+        );
     }
 
     #[test]
@@ -186,7 +192,11 @@ mod tests {
                         - Không có\n";
         let path = write_file(dir.path(), "report.md", content);
         let results = check_discovery(&path);
-        assert!(results.iter().all(|r| matches!(r.status, CheckStatus::Pass)));
+        assert!(
+            results
+                .iter()
+                .all(|r| matches!(r.status, CheckStatus::Pass))
+        );
     }
 
     #[test]

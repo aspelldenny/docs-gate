@@ -67,10 +67,7 @@ impl DocsGateServer {
 
     /// Run all checks (changelog + architecture + tickets)
     #[tool(name = "check_all")]
-    fn check_all(
-        &self,
-        Parameters(params): Parameters<DocsDirParam>,
-    ) -> Json<Vec<CheckResult>> {
+    fn check_all(&self, Parameters(params): Parameters<DocsDirParam>) -> Json<Vec<CheckResult>> {
         let config = tools::resolve_config(&self.config, params.docs_dir);
         Json(checks::run_all_checks_extended(&config))
     }

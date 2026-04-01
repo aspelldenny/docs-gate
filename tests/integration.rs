@@ -16,13 +16,18 @@ fn create_fixture(dir: &std::path::Path, docs_dir: &str, files: &[(&str, &str)])
 }
 
 fn today_str() -> String {
-    chrono::Local::now().date_naive().format("%Y-%m-%d").to_string()
+    chrono::Local::now()
+        .date_naive()
+        .format("%Y-%m-%d")
+        .to_string()
 }
 
 fn full_architecture() -> String {
     let mut s = String::from("# ARCHITECTURE\n\n");
     for i in 1..=9 {
-        s.push_str(&format!("## {i}. Section {i}\n\nContent for section {i}.\n\n"));
+        s.push_str(&format!(
+            "## {i}. Section {i}\n\nContent for section {i}.\n\n"
+        ));
     }
     s
 }
@@ -30,11 +35,18 @@ fn full_architecture() -> String {
 #[test]
 fn test_all_pass_exit_0() {
     let dir = tempfile::tempdir().unwrap();
-    let changelog = format!("# CHANGELOG\n\n## [v1] Release — {}\n- Added stuff\n", today_str());
-    create_fixture(dir.path(), "docs", &[
-        ("CHANGELOG.md", &changelog),
-        ("ARCHITECTURE.md", &full_architecture()),
-    ]);
+    let changelog = format!(
+        "# CHANGELOG\n\n## [v1] Release — {}\n- Added stuff\n",
+        today_str()
+    );
+    create_fixture(
+        dir.path(),
+        "docs",
+        &[
+            ("CHANGELOG.md", &changelog),
+            ("ARCHITECTURE.md", &full_architecture()),
+        ],
+    );
 
     let output = docs_gate_bin()
         .current_dir(dir.path())
@@ -50,14 +62,13 @@ fn test_all_pass_exit_0() {
 #[test]
 fn test_missing_changelog_exit_1() {
     let dir = tempfile::tempdir().unwrap();
-    create_fixture(dir.path(), "docs", &[
-        ("ARCHITECTURE.md", &full_architecture()),
-    ]);
+    create_fixture(
+        dir.path(),
+        "docs",
+        &[("ARCHITECTURE.md", &full_architecture())],
+    );
 
-    let output = docs_gate_bin()
-        .current_dir(dir.path())
-        .output()
-        .unwrap();
+    let output = docs_gate_bin().current_dir(dir.path()).output().unwrap();
 
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(!output.status.success(), "Expected exit 1, got: {stdout}");
@@ -67,15 +78,13 @@ fn test_missing_changelog_exit_1() {
 #[test]
 fn test_missing_architecture_exit_1() {
     let dir = tempfile::tempdir().unwrap();
-    let changelog = format!("# CHANGELOG\n\n## [v1] Release — {}\n- Added stuff\n", today_str());
-    create_fixture(dir.path(), "docs", &[
-        ("CHANGELOG.md", &changelog),
-    ]);
+    let changelog = format!(
+        "# CHANGELOG\n\n## [v1] Release — {}\n- Added stuff\n",
+        today_str()
+    );
+    create_fixture(dir.path(), "docs", &[("CHANGELOG.md", &changelog)]);
 
-    let output = docs_gate_bin()
-        .current_dir(dir.path())
-        .output()
-        .unwrap();
+    let output = docs_gate_bin().current_dir(dir.path()).output().unwrap();
 
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(!output.status.success(), "Expected exit 1");
@@ -85,11 +94,18 @@ fn test_missing_architecture_exit_1() {
 #[test]
 fn test_verbose_shows_pass_results() {
     let dir = tempfile::tempdir().unwrap();
-    let changelog = format!("# CHANGELOG\n\n## [v1] Release — {}\n- Added stuff\n", today_str());
-    create_fixture(dir.path(), "docs", &[
-        ("CHANGELOG.md", &changelog),
-        ("ARCHITECTURE.md", &full_architecture()),
-    ]);
+    let changelog = format!(
+        "# CHANGELOG\n\n## [v1] Release — {}\n- Added stuff\n",
+        today_str()
+    );
+    create_fixture(
+        dir.path(),
+        "docs",
+        &[
+            ("CHANGELOG.md", &changelog),
+            ("ARCHITECTURE.md", &full_architecture()),
+        ],
+    );
 
     let output = docs_gate_bin()
         .current_dir(dir.path())
@@ -105,21 +121,28 @@ fn test_verbose_shows_pass_results() {
 #[test]
 fn test_custom_config() {
     let dir = tempfile::tempdir().unwrap();
-    let changelog = format!("# CHANGELOG\n\n## [v1] Release — {}\n- Added stuff\n", today_str());
-    create_fixture(dir.path(), "mydocs", &[
-        ("CHANGELOG.md", &changelog),
-        ("ARCHITECTURE.md", &full_architecture()),
-    ]);
+    let changelog = format!(
+        "# CHANGELOG\n\n## [v1] Release — {}\n- Added stuff\n",
+        today_str()
+    );
+    create_fixture(
+        dir.path(),
+        "mydocs",
+        &[
+            ("CHANGELOG.md", &changelog),
+            ("ARCHITECTURE.md", &full_architecture()),
+        ],
+    );
 
     let config_path = dir.path().join(".docs-gate.toml");
     std::fs::write(&config_path, "docs_dir = \"mydocs\"\n").unwrap();
 
-    let output = docs_gate_bin()
-        .current_dir(dir.path())
-        .output()
-        .unwrap();
+    let output = docs_gate_bin().current_dir(dir.path()).output().unwrap();
 
-    assert!(output.status.success(), "Expected exit 0 with custom config");
+    assert!(
+        output.status.success(),
+        "Expected exit 0 with custom config"
+    );
 }
 
 fn valid_discovery() -> String {
@@ -157,7 +180,11 @@ fn test_check_discovery_pass() {
 fn test_check_discovery_fail_missing_section() {
     let dir = tempfile::tempdir().unwrap();
     let report_path = dir.path().join("report.md");
-    std::fs::write(&report_path, "## Discovery Report\n### Assumptions trong phiếu — ĐÚNG:\n- Yes\n").unwrap();
+    std::fs::write(
+        &report_path,
+        "## Discovery Report\n### Assumptions trong phiếu — ĐÚNG:\n- Yes\n",
+    )
+    .unwrap();
 
     let output = docs_gate_bin()
         .arg("check-discovery")
@@ -173,15 +200,26 @@ fn test_check_discovery_fail_missing_section() {
 #[test]
 fn test_all_flag_includes_ticket_check() {
     let dir = tempfile::tempdir().unwrap();
-    let changelog = format!("# CHANGELOG\n\n## [v1] Release — {}\n- Added stuff\n", today_str());
-    create_fixture(dir.path(), "docs", &[
-        ("CHANGELOG.md", &changelog),
-        ("ARCHITECTURE.md", &full_architecture()),
-    ]);
+    let changelog = format!(
+        "# CHANGELOG\n\n## [v1] Release — {}\n- Added stuff\n",
+        today_str()
+    );
+    create_fixture(
+        dir.path(),
+        "docs",
+        &[
+            ("CHANGELOG.md", &changelog),
+            ("ARCHITECTURE.md", &full_architecture()),
+        ],
+    );
     // Create ticket dir with valid ticket
     let ticket_dir = dir.path().join("docs").join("ticket");
     std::fs::create_dir_all(&ticket_dir).unwrap();
-    std::fs::write(ticket_dir.join("PHIEU-1.md"), "# Phiếu\n\n**Type:** `mutating`\n").unwrap();
+    std::fs::write(
+        ticket_dir.join("PHIEU-1.md"),
+        "# Phiếu\n\n**Type:** `mutating`\n",
+    )
+    .unwrap();
 
     let output = docs_gate_bin()
         .current_dir(dir.path())
@@ -255,11 +293,18 @@ fn test_watch_sigint_clean_exit() {
 #[test]
 fn test_default_no_ticket_check() {
     let dir = tempfile::tempdir().unwrap();
-    let changelog = format!("# CHANGELOG\n\n## [v1] Release — {}\n- Added stuff\n", today_str());
-    create_fixture(dir.path(), "docs", &[
-        ("CHANGELOG.md", &changelog),
-        ("ARCHITECTURE.md", &full_architecture()),
-    ]);
+    let changelog = format!(
+        "# CHANGELOG\n\n## [v1] Release — {}\n- Added stuff\n",
+        today_str()
+    );
+    create_fixture(
+        dir.path(),
+        "docs",
+        &[
+            ("CHANGELOG.md", &changelog),
+            ("ARCHITECTURE.md", &full_architecture()),
+        ],
+    );
     // Create ticket dir with INVALID ticket (no Type)
     let ticket_dir = dir.path().join("docs").join("ticket");
     std::fs::create_dir_all(&ticket_dir).unwrap();
@@ -273,6 +318,9 @@ fn test_default_no_ticket_check() {
 
     let stdout = String::from_utf8_lossy(&output.stdout);
     // Without --all, ticket check should NOT run, so bad ticket doesn't cause failure
-    assert!(output.status.success(), "Expected exit 0 without --all: {stdout}");
+    assert!(
+        output.status.success(),
+        "Expected exit 0 without --all: {stdout}"
+    );
     assert!(!stdout.contains("ticket"));
 }

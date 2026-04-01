@@ -88,7 +88,10 @@ mod tests {
         assert_eq!(config.required_non_empty, vec![7, 8, 9]);
         assert_eq!(config.changelog_max_age_days, 1);
         assert_eq!(config.ticket.ticket_dir, PathBuf::from("docs/ticket"));
-        assert_eq!(config.ticket.valid_types, vec!["read-only", "mutating", "destructive"]);
+        assert_eq!(
+            config.ticket.valid_types,
+            vec!["read-only", "mutating", "destructive"]
+        );
         assert_eq!(config.ticket.exclude_files, vec!["TEMPLATE.md"]);
     }
 
@@ -140,7 +143,10 @@ mod tests {
         let config = load_config(Some(&path));
         // ticket defaults
         assert_eq!(config.ticket.ticket_dir, PathBuf::from("docs/ticket"));
-        assert_eq!(config.ticket.valid_types, vec!["read-only", "mutating", "destructive"]);
+        assert_eq!(
+            config.ticket.valid_types,
+            vec!["read-only", "mutating", "destructive"]
+        );
     }
 
     #[test]

@@ -35,7 +35,9 @@ pub fn format_results(results: &[CheckResult], verbose: bool) -> String {
     if failed == 0 {
         lines.push(format!("\n✅ All checks passed ({total}/{total})"));
     } else {
-        lines.push(format!("\n❌ {failed} check(s) failed ({passed}/{total} passed)"));
+        lines.push(format!(
+            "\n❌ {failed} check(s) failed ({passed}/{total} passed)"
+        ));
     }
 
     lines.join("\n")
@@ -58,11 +60,17 @@ mod tests {
     use super::*;
 
     fn pass_result(name: &str) -> CheckResult {
-        CheckResult { name: String::from(name), status: CheckStatus::Pass }
+        CheckResult {
+            name: String::from(name),
+            status: CheckStatus::Pass,
+        }
     }
 
     fn fail_result(name: &str, reason: &str) -> CheckResult {
-        CheckResult { name: String::from(name), status: CheckStatus::Fail(String::from(reason)) }
+        CheckResult {
+            name: String::from(name),
+            status: CheckStatus::Fail(String::from(reason)),
+        }
     }
 
     #[test]
@@ -84,7 +92,10 @@ mod tests {
 
     #[test]
     fn test_with_failure() {
-        let results = vec![pass_result("changelog"), fail_result("architecture", "Section 7 empty")];
+        let results = vec![
+            pass_result("changelog"),
+            fail_result("architecture", "Section 7 empty"),
+        ];
         let output = format_results(&results, false);
         assert!(output.contains("❌ FAIL: architecture — Section 7 empty"));
         assert!(output.contains("1 check(s) failed (1/2 passed)"));

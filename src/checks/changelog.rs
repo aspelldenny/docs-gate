@@ -91,12 +91,10 @@ pub fn check_changelog(config: &Config) -> CheckResult {
         .map(|(i, _)| i)
         .unwrap_or(lines.len());
 
-    let has_content = lines[heading_idx + 1..next_heading]
-        .iter()
-        .any(|l| {
-            let trimmed = l.trim();
-            !trimmed.is_empty() && !trimmed.starts_with("<!--")
-        });
+    let has_content = lines[heading_idx + 1..next_heading].iter().any(|l| {
+        let trimmed = l.trim();
+        !trimmed.is_empty() && !trimmed.starts_with("<!--")
+    });
 
     if !has_content {
         return CheckResult {
@@ -130,7 +128,10 @@ mod tests {
     }
 
     fn today_str() -> String {
-        chrono::Local::now().date_naive().format("%Y-%m-%d").to_string()
+        chrono::Local::now()
+            .date_naive()
+            .format("%Y-%m-%d")
+            .to_string()
     }
 
     fn days_ago_str(days: i64) -> String {
@@ -141,10 +142,13 @@ mod tests {
     #[test]
     fn test_pass_entry_today() {
         let dir = tempfile::tempdir().unwrap();
-        write_changelog(dir.path(), &format!(
-            "# CHANGELOG\n\n## [v1] Release — {}\n- Added feature X\n",
-            today_str()
-        ));
+        write_changelog(
+            dir.path(),
+            &format!(
+                "# CHANGELOG\n\n## [v1] Release — {}\n- Added feature X\n",
+                today_str()
+            ),
+        );
         let result = check_changelog(&config_with_dir(dir.path()));
         assert!(matches!(result.status, CheckStatus::Pass));
     }
@@ -152,10 +156,13 @@ mod tests {
     #[test]
     fn test_pass_entry_yesterday() {
         let dir = tempfile::tempdir().unwrap();
-        write_changelog(dir.path(), &format!(
-            "# CHANGELOG\n\n## [v1] Release — {}\n- Fixed bug\n",
-            days_ago_str(1)
-        ));
+        write_changelog(
+            dir.path(),
+            &format!(
+                "# CHANGELOG\n\n## [v1] Release — {}\n- Fixed bug\n",
+                days_ago_str(1)
+            ),
+        );
         let result = check_changelog(&config_with_dir(dir.path()));
         assert!(matches!(result.status, CheckStatus::Pass));
     }
@@ -163,12 +170,17 @@ mod tests {
     #[test]
     fn test_fail_entry_too_old() {
         let dir = tempfile::tempdir().unwrap();
-        write_changelog(dir.path(), &format!(
-            "# CHANGELOG\n\n## [v1] Release — {}\n- Old stuff\n",
-            days_ago_str(3)
-        ));
+        write_changelog(
+            dir.path(),
+            &format!(
+                "# CHANGELOG\n\n## [v1] Release — {}\n- Old stuff\n",
+                days_ago_str(3)
+            ),
+        );
         let result = check_changelog(&config_with_dir(dir.path()));
-        assert!(matches!(result.status, CheckStatus::Fail(ref s) if s.starts_with("Last entry too old")));
+        assert!(
+            matches!(result.status, CheckStatus::Fail(ref s) if s.starts_with("Last entry too old"))
+        );
     }
 
     #[test]
@@ -176,7 +188,9 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         // No file created
         let result = check_changelog(&config_with_dir(dir.path()));
-        assert!(matches!(result.status, CheckStatus::Fail(ref s) if s.starts_with("File not found")));
+        assert!(
+            matches!(result.status, CheckStatus::Fail(ref s) if s.starts_with("File not found"))
+        );
     }
 
     #[test]
@@ -190,7 +204,10 @@ mod tests {
     #[test]
     fn test_fail_no_heading() {
         let dir = tempfile::tempdir().unwrap();
-        write_changelog(dir.path(), "# CHANGELOG\n\nJust some text without entries.\n");
+        write_changelog(
+            dir.path(),
+            "# CHANGELOG\n\nJust some text without entries.\n",
+        );
         let result = check_changelog(&config_with_dir(dir.path()));
         assert!(matches!(result.status, CheckStatus::Fail(ref s) if s == "No entries found"));
     }
@@ -198,10 +215,13 @@ mod tests {
     #[test]
     fn test_fail_entry_empty_content() {
         let dir = tempfile::tempdir().unwrap();
-        write_changelog(dir.path(), &format!(
-            "# CHANGELOG\n\n## [v1] Release — {}\n\n## [v0] Old\n- stuff\n",
-            today_str()
-        ));
+        write_changelog(
+            dir.path(),
+            &format!(
+                "# CHANGELOG\n\n## [v1] Release — {}\n\n## [v0] Old\n- stuff\n",
+                today_str()
+            ),
+        );
         let result = check_changelog(&config_with_dir(dir.path()));
         assert!(matches!(result.status, CheckStatus::Fail(ref s) if s == "Entry empty"));
     }
@@ -209,8 +229,13 @@ mod tests {
     #[test]
     fn test_fail_no_date() {
         let dir = tempfile::tempdir().unwrap();
-        write_changelog(dir.path(), "# CHANGELOG\n\n## [v1] Release without date\n- content\n");
+        write_changelog(
+            dir.path(),
+            "# CHANGELOG\n\n## [v1] Release without date\n- content\n",
+        );
         let result = check_changelog(&config_with_dir(dir.path()));
-        assert!(matches!(result.status, CheckStatus::Fail(ref s) if s == "No date found in latest entry"));
+        assert!(
+            matches!(result.status, CheckStatus::Fail(ref s) if s == "No date found in latest entry")
+        );
     }
 }
