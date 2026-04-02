@@ -230,15 +230,12 @@ fn detect_type_pattern(contents: &[String]) -> (String, Vec<String>) {
             // Skip keys with spaces (e.g. "Service test (macOS only)", "Type-check")
             let key_looks_like_type = key.len() <= 20 && !key.contains(' ') && !key.contains('(');
             let unique: std::collections::HashSet<_> = vals.iter().collect();
+            let type_value_re = regex::Regex::new(r"^[a-zA-ZÀ-ỹ][a-zA-ZÀ-ỹ0-9_-]{0,28}$").unwrap();
             let is_categorical = vals.iter().all(|v| {
-                // Type/category values are short, simple words (e.g. "mutating", "read-only")
-                // Filter out: file paths, shell commands, long strings
-                v.len() <= 30
-                    && !v.contains('/')
-                    && !v.contains('\\')
-                    && !v.contains('|')
-                    && !v.contains('(')
-                    && !v.contains('$')
+                // Type/category values: single word with letters/hyphens/underscores
+                // e.g. "mutating", "read-only", "Hotfix", "Prompt-only", "Feature"
+                // Reject anything with spaces (commands, descriptions)
+                type_value_re.is_match(v)
             });
             key_looks_like_type
                 && unique.len() <= 10
