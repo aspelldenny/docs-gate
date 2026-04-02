@@ -90,10 +90,7 @@ async fn main() -> ExitCode {
                         );
                     }
                     if !config.ticket.exclude_files.is_empty() {
-                        eprintln!(
-                            "  ✓ Excluded: {}",
-                            config.ticket.exclude_files.join(", ")
-                        );
+                        eprintln!("  ✓ Excluded: {}", config.ticket.exclude_files.join(", "));
                     }
                     eprintln!();
                     eprintln!("📝 Generated .docs-gate.toml");

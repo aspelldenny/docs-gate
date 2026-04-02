@@ -327,8 +327,18 @@ mod tests {
         writeln!(f, "# Phiếu 1\n\n**Type:** `mutating`\n").unwrap();
 
         let config = scan_project(dir.path());
-        assert!(config.ticket.exclude_files.contains(&"TICKET_TEMPLATE.md".to_string()));
-        assert!(config.ticket.exclude_files.contains(&"README.md".to_string()));
+        assert!(
+            config
+                .ticket
+                .exclude_files
+                .contains(&"TICKET_TEMPLATE.md".to_string())
+        );
+        assert!(
+            config
+                .ticket
+                .exclude_files
+                .contains(&"README.md".to_string())
+        );
     }
 
     #[test]
@@ -367,10 +377,8 @@ mod tests {
     #[test]
     fn test_detect_type_pattern_ignores_file_paths() {
         let contents = vec![
-            "# T1\n\n**File cần sửa:** `src/app/api/route.ts`\n**Loại:** `mutating`\n"
-                .to_string(),
-            "# T2\n\n**File cần sửa:** `src/lib/ai/digest.ts`\n**Loại:** `read-only`\n"
-                .to_string(),
+            "# T1\n\n**File cần sửa:** `src/app/api/route.ts`\n**Loại:** `mutating`\n".to_string(),
+            "# T2\n\n**File cần sửa:** `src/lib/ai/digest.ts`\n**Loại:** `read-only`\n".to_string(),
         ];
         let (pattern, types) = detect_type_pattern(&contents);
         assert!(pattern.is_some());
