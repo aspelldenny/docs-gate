@@ -2,7 +2,7 @@ use std::path::Path;
 
 use rmcp::handler::server::tool::ToolCallContext;
 use rmcp::handler::server::tool::ToolRouter;
-use rmcp::handler::server::wrapper::{Json, Parameters};
+use rmcp::handler::server::wrapper::Parameters;
 use rmcp::model::{
     CallToolRequestParam, CallToolResult, Implementation, ListToolsResult, ServerCapabilities,
     ServerInfo,
@@ -12,7 +12,6 @@ use rmcp::service::RoleServer;
 use rmcp::{tool, tool_router};
 
 use crate::checks;
-use crate::checks::CheckResult;
 use crate::config::Config;
 
 use super::tools::{self, DocsDirParam, FilePathParam};
@@ -37,39 +36,34 @@ impl DocsGateServer {
 impl DocsGateServer {
     /// Check CHANGELOG.md has a recent entry
     #[tool(name = "check_changelog")]
-    fn check_changelog(
-        &self,
-        Parameters(params): Parameters<DocsDirParam>,
-    ) -> Json<Vec<CheckResult>> {
+    fn check_changelog(&self, Parameters(params): Parameters<DocsDirParam>) -> String {
         let config = tools::resolve_config(&self.config, params.docs_dir);
-        Json(vec![checks::changelog::check_changelog(&config)])
+        let results = vec![checks::changelog::check_changelog(&config)];
+        serde_json::to_string_pretty(&results).unwrap()
     }
 
-    /// Check ARCHITECTURE.md has 9 sections with non-empty 7, 8, 9
+    /// Check ARCHITECTURE.md sections and required non-empty content
     #[tool(name = "check_architecture")]
-    fn check_architecture(
-        &self,
-        Parameters(params): Parameters<DocsDirParam>,
-    ) -> Json<Vec<CheckResult>> {
+    fn check_architecture(&self, Parameters(params): Parameters<DocsDirParam>) -> String {
         let config = tools::resolve_config(&self.config, params.docs_dir);
-        Json(checks::architecture::check_architecture(&config))
+        let results = checks::architecture::check_architecture(&config);
+        serde_json::to_string_pretty(&results).unwrap()
     }
 
     /// Check Discovery Report format in a specific file
     #[tool(name = "check_discovery")]
-    fn check_discovery(
-        &self,
-        Parameters(params): Parameters<FilePathParam>,
-    ) -> Json<Vec<CheckResult>> {
+    fn check_discovery(&self, Parameters(params): Parameters<FilePathParam>) -> String {
         let path = Path::new(&params.file_path);
-        Json(checks::discovery::check_discovery(path))
+        let results = checks::discovery::check_discovery(path);
+        serde_json::to_string_pretty(&results).unwrap()
     }
 
-    /// Run all checks (changelog + architecture + tickets)
+    /// Run all checks: changelog + architecture + tickets. Use this before every commit.
     #[tool(name = "check_all")]
-    fn check_all(&self, Parameters(params): Parameters<DocsDirParam>) -> Json<Vec<CheckResult>> {
+    fn check_all(&self, Parameters(params): Parameters<DocsDirParam>) -> String {
         let config = tools::resolve_config(&self.config, params.docs_dir);
-        Json(checks::run_all_checks_extended(&config))
+        let results = checks::run_all_checks_extended(&config);
+        serde_json::to_string_pretty(&results).unwrap()
     }
 }
 
@@ -84,6 +78,14 @@ impl rmcp::ServerHandler for DocsGateServer {
                 website_url: None,
             },
             capabilities: ServerCapabilities::builder().enable_tools().build(),
+            instructions: Some(String::from(
+                "Use docs-gate to check documentation compliance before committing code. \
+                 Run `check_all` after updating docs and BEFORE every git commit. \
+                 If any check fails, fix the docs first, re-run until all checks pass, \
+                 then proceed with the commit. Available checks: changelog (recent entry), \
+                 architecture (required sections), tickets (type declarations), \
+                 discovery (report format).",
+            )),
             ..Default::default()
         }
     }
