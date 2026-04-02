@@ -2,8 +2,16 @@ use crate::checks::{CheckResult, CheckStatus};
 use crate::config::Config;
 
 pub fn check_architecture(config: &Config) -> Vec<CheckResult> {
-    let path = config.docs_dir.join(&config.architecture);
     let name_prefix = "architecture";
+
+    if !config.architecture.enabled {
+        return vec![CheckResult {
+            name: String::from(name_prefix),
+            status: CheckStatus::Pass,
+        }];
+    }
+
+    let path = config.docs_dir.join(&config.architecture.file);
 
     let content = match std::fs::read_to_string(&path) {
         Ok(c) => c,
@@ -34,7 +42,7 @@ pub fn check_architecture(config: &Config) -> Vec<CheckResult> {
     let unique_sections: std::collections::HashSet<usize> =
         sections.iter().map(|(_, n)| *n).collect();
     let found = unique_sections.len();
-    let required = config.required_sections;
+    let required = config.architecture.required_sections;
 
     if found < required {
         results.push(CheckResult {
@@ -49,7 +57,7 @@ pub fn check_architecture(config: &Config) -> Vec<CheckResult> {
     }
 
     // Check required non-empty sections
-    for &section_num in &config.required_non_empty {
+    for &section_num in &config.architecture.required_non_empty {
         let section_pos = sections.iter().find(|(_, n)| *n == section_num);
 
         match section_pos {
@@ -60,7 +68,6 @@ pub fn check_architecture(config: &Config) -> Vec<CheckResult> {
                 });
             }
             Some(&(line_idx, _)) => {
-                // Find next section heading
                 let next_heading = sections
                     .iter()
                     .find(|(i, _)| *i > line_idx)
@@ -100,6 +107,7 @@ mod tests {
     fn config_with_dir(dir: &std::path::Path) -> Config {
         Config {
             docs_dir: dir.to_path_buf(),
+            architecture: crate::config::ArchitectureConfig::default(),
             ..Config::default()
         }
     }
@@ -219,6 +227,20 @@ mod tests {
     }
 
     #[test]
+    fn test_disabled_returns_pass() {
+        let config = Config {
+            architecture: crate::config::ArchitectureConfig {
+                enabled: false,
+                ..crate::config::ArchitectureConfig::default()
+            },
+            ..Config::default()
+        };
+        let results = check_architecture(&config);
+        assert_eq!(results.len(), 1);
+        assert!(matches!(results[0].status, CheckStatus::Pass));
+    }
+
+    #[test]
     fn test_pass_custom_required_sections() {
         let dir = tempfile::tempdir().unwrap();
         let mut content = String::from("# ARCH\n\n");
@@ -228,8 +250,11 @@ mod tests {
         write_arch(dir.path(), &content);
         let config = Config {
             docs_dir: dir.path().to_path_buf(),
-            required_sections: 3,
-            required_non_empty: vec![1, 2],
+            architecture: crate::config::ArchitectureConfig {
+                required_sections: 3,
+                required_non_empty: vec![1, 2],
+                ..crate::config::ArchitectureConfig::default()
+            },
             ..Config::default()
         };
         let results = check_architecture(&config);

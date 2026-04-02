@@ -39,7 +39,19 @@ pub fn check_tickets(config: &Config) -> Vec<CheckResult> {
         }];
     }
 
-    let type_re = regex::Regex::new(r"\*\*Type:\*\*\s*`([^`]+)`").unwrap();
+    // If no type_pattern configured, skip type validation — just check files exist
+    let type_re = match &config.ticket.type_pattern {
+        Some(pattern) => match regex::Regex::new(pattern) {
+            Ok(re) => Some(re),
+            Err(e) => {
+                return vec![CheckResult {
+                    name: String::from("ticket"),
+                    status: CheckStatus::Fail(format!("Invalid type_pattern regex: {e}")),
+                }];
+            }
+        },
+        None => None,
+    };
 
     let mut results = Vec::new();
 
@@ -58,7 +70,16 @@ pub fn check_tickets(config: &Config) -> Vec<CheckResult> {
             }
         };
 
-        let captures: Vec<_> = type_re.captures_iter(&content).collect();
+        // No type_pattern → pass without type validation
+        let Some(ref re) = type_re else {
+            results.push(CheckResult {
+                name: format!("ticket-{filename}"),
+                status: CheckStatus::Pass,
+            });
+            continue;
+        };
+
+        let captures: Vec<_> = re.captures_iter(&content).collect();
 
         if captures.is_empty() {
             results.push(CheckResult {
@@ -191,6 +212,48 @@ mod tests {
         );
         let results = check_tickets(&config_with_dir(dir.path()));
         // TEMPLATE.md skipped, only PHIEU-1.md checked
+        assert_eq!(results.len(), 1);
+        assert!(matches!(results[0].status, CheckStatus::Pass));
+    }
+
+    #[test]
+    fn test_pass_custom_type_pattern() {
+        let dir = tempfile::tempdir().unwrap();
+        write_ticket(
+            dir.path(),
+            "PHIEU-1.md",
+            "# Phiếu 1\n\n**Loại:** `mutating`\n",
+        );
+        let config = Config {
+            ticket: crate::config::TicketConfig {
+                ticket_dir: dir.path().to_path_buf(),
+                type_pattern: Some(r"\*\*Loại:\*\*\s*`([^`]+)`".to_string()),
+                ..crate::config::TicketConfig::default()
+            },
+            ..Config::default()
+        };
+        let results = check_tickets(&config);
+        assert_eq!(results.len(), 1);
+        assert!(matches!(results[0].status, CheckStatus::Pass));
+    }
+
+    #[test]
+    fn test_pass_no_type_pattern_skips_validation() {
+        let dir = tempfile::tempdir().unwrap();
+        write_ticket(
+            dir.path(),
+            "PHIEU-1.md",
+            "# Phiếu 1\n\nNo type field at all\n",
+        );
+        let config = Config {
+            ticket: crate::config::TicketConfig {
+                ticket_dir: dir.path().to_path_buf(),
+                type_pattern: None,
+                ..crate::config::TicketConfig::default()
+            },
+            ..Config::default()
+        };
+        let results = check_tickets(&config);
         assert_eq!(results.len(), 1);
         assert!(matches!(results[0].status, CheckStatus::Pass));
     }

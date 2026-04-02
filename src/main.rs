@@ -1,5 +1,6 @@
 mod checks;
 mod config;
+mod init;
 mod mcp;
 mod output;
 mod watch;
@@ -43,6 +44,8 @@ enum Commands {
     },
     /// Start MCP server on stdio transport
     Serve,
+    /// Scan project and generate .docs-gate.toml
+    Init,
 }
 
 #[tokio::main(flavor = "current_thread")]
@@ -58,6 +61,52 @@ async fn main() -> ExitCode {
     let config = config::load_config(cli.config.as_deref());
 
     match cli.command {
+        Some(Commands::Init) => {
+            let root = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+            let config = init::scan_project(&root);
+            match init::write_config(&root, &config) {
+                Ok(content) => {
+                    eprintln!("🔍 Scanned project at {}", root.display());
+                    eprintln!();
+                    if config.architecture.enabled {
+                        eprintln!(
+                            "  ✓ Architecture: {} ({} sections)",
+                            config.architecture.file, config.architecture.required_sections
+                        );
+                    } else {
+                        eprintln!("  ✗ Architecture: disabled (no file found)");
+                    }
+                    eprintln!("  ✓ Changelog: {}", config.changelog);
+                    if config.ticket.type_pattern.is_some() {
+                        eprintln!(
+                            "  ✓ Tickets: {} (types: {})",
+                            config.ticket.ticket_dir.display(),
+                            config.ticket.valid_types.join(", ")
+                        );
+                    } else {
+                        eprintln!(
+                            "  ✓ Tickets: {} (no type validation)",
+                            config.ticket.ticket_dir.display()
+                        );
+                    }
+                    if !config.ticket.exclude_files.is_empty() {
+                        eprintln!(
+                            "  ✓ Excluded: {}",
+                            config.ticket.exclude_files.join(", ")
+                        );
+                    }
+                    eprintln!();
+                    eprintln!("📝 Generated .docs-gate.toml");
+                    eprintln!();
+                    print!("{content}");
+                    ExitCode::from(0)
+                }
+                Err(e) => {
+                    eprintln!("Error: Cannot write .docs-gate.toml: {e}");
+                    ExitCode::from(1)
+                }
+            }
+        }
         Some(Commands::Serve) => {
             let server = mcp::server::DocsGateServer::new(config);
             let transport = rmcp::transport::stdio();
