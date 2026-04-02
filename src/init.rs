@@ -225,7 +225,10 @@ fn detect_type_pattern(contents: &[String]) -> (String, Vec<String>) {
     // Filter out keys where values look like file paths, URLs, or other non-categorical data
     if let Some((key, values)) = key_counts
         .iter()
-        .filter(|(_, vals)| {
+        .filter(|(key, vals)| {
+            // Key name should be short and simple (e.g. "Type", "Loại", "Classification")
+            // Skip keys with spaces (e.g. "Service test (macOS only)", "Type-check")
+            let key_looks_like_type = key.len() <= 20 && !key.contains(' ') && !key.contains('(');
             let unique: std::collections::HashSet<_> = vals.iter().collect();
             let is_categorical = vals.iter().all(|v| {
                 // Type/category values are short, simple words (e.g. "mutating", "read-only")
@@ -237,7 +240,10 @@ fn detect_type_pattern(contents: &[String]) -> (String, Vec<String>) {
                     && !v.contains('(')
                     && !v.contains('$')
             });
-            unique.len() <= 10 && vals.len() >= contents.len() / 2 && is_categorical
+            key_looks_like_type
+                && unique.len() <= 10
+                && vals.len() >= contents.len() / 2
+                && is_categorical
         })
         .max_by_key(|(_, vals)| vals.len())
     {
