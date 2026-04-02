@@ -24,7 +24,7 @@ pub struct ArchitectureConfig {
 #[serde(default)]
 pub struct TicketConfig {
     pub ticket_dir: PathBuf,
-    pub type_pattern: Option<String>,
+    pub type_pattern: String,
     pub valid_types: Vec<String>,
     pub exclude_files: Vec<String>,
 }
@@ -56,7 +56,7 @@ impl Default for TicketConfig {
     fn default() -> Self {
         Self {
             ticket_dir: PathBuf::from("docs/ticket"),
-            type_pattern: Some(String::from(r"\*\*Type:\*\*\s*`([^`]+)`")),
+            type_pattern: String::from(r"\*\*Type:\*\*\s*`([^`]+)`"),
             valid_types: vec![
                 String::from("read-only"),
                 String::from("mutating"),
@@ -107,7 +107,7 @@ mod tests {
         assert_eq!(config.architecture.required_non_empty, vec![7, 8, 9]);
         assert_eq!(config.changelog_max_age_days, 1);
         assert_eq!(config.ticket.ticket_dir, PathBuf::from("docs/ticket"));
-        assert!(config.ticket.type_pattern.is_some());
+        assert!(!config.ticket.type_pattern.is_empty());
         assert_eq!(
             config.ticket.valid_types,
             vec!["read-only", "mutating", "destructive"]
@@ -162,10 +162,7 @@ mod tests {
         let config = load_config(Some(&path));
         assert_eq!(config.ticket.ticket_dir, PathBuf::from("custom/tickets"));
         assert_eq!(config.ticket.exclude_files, vec!["TEMPLATE.md", "DRAFT.md"]);
-        assert_eq!(
-            config.ticket.type_pattern.as_deref(),
-            Some(r"\*\*Loại:\*\*\s*`([^`]+)`")
-        );
+        assert_eq!(config.ticket.type_pattern, r"\*\*Loại:\*\*\s*`([^`]+)`");
         assert_eq!(config.docs_dir, PathBuf::from("docs"));
     }
 
@@ -179,7 +176,7 @@ mod tests {
 
         let config = load_config(Some(&path));
         // When ticket section exists but type_pattern not set, uses default
-        assert!(config.ticket.type_pattern.is_some());
+        assert!(!config.ticket.type_pattern.is_empty());
     }
 
     #[test]

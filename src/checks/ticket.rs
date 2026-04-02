@@ -39,9 +39,11 @@ pub fn check_tickets(config: &Config) -> Vec<CheckResult> {
         }];
     }
 
-    // If no type_pattern configured, skip type validation — just check files exist
-    let type_re = match &config.ticket.type_pattern {
-        Some(pattern) => match regex::Regex::new(pattern) {
+    // If type_pattern is empty, skip type validation
+    let type_re = if config.ticket.type_pattern.is_empty() {
+        None
+    } else {
+        match regex::Regex::new(&config.ticket.type_pattern) {
             Ok(re) => Some(re),
             Err(e) => {
                 return vec![CheckResult {
@@ -49,8 +51,7 @@ pub fn check_tickets(config: &Config) -> Vec<CheckResult> {
                     status: CheckStatus::Fail(format!("Invalid type_pattern regex: {e}")),
                 }];
             }
-        },
-        None => None,
+        }
     };
 
     let mut results = Vec::new();
@@ -227,7 +228,7 @@ mod tests {
         let config = Config {
             ticket: crate::config::TicketConfig {
                 ticket_dir: dir.path().to_path_buf(),
-                type_pattern: Some(r"\*\*Loại:\*\*\s*`([^`]+)`".to_string()),
+                type_pattern: r"\*\*Loại:\*\*\s*`([^`]+)`".to_string(),
                 ..crate::config::TicketConfig::default()
             },
             ..Config::default()
@@ -248,7 +249,7 @@ mod tests {
         let config = Config {
             ticket: crate::config::TicketConfig {
                 ticket_dir: dir.path().to_path_buf(),
-                type_pattern: None,
+                type_pattern: String::new(),
                 ..crate::config::TicketConfig::default()
             },
             ..Config::default()
