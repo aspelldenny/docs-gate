@@ -222,11 +222,13 @@ fn detect_type_pattern(contents: &[String]) -> (Option<String>, Vec<String>) {
     }
 
     // Find the key that appears in most files with limited unique values (likely a type/category)
+    // Filter out keys where values look like file paths, URLs, or other non-categorical data
     if let Some((key, values)) = key_counts
         .iter()
         .filter(|(_, vals)| {
             let unique: std::collections::HashSet<_> = vals.iter().collect();
-            unique.len() <= 10 && vals.len() >= contents.len() / 2
+            let has_paths = vals.iter().any(|v| v.contains('/') || v.contains('\\'));
+            unique.len() <= 10 && vals.len() >= contents.len() / 2 && !has_paths
         })
         .max_by_key(|(_, vals)| vals.len())
     {
@@ -360,6 +362,33 @@ mod tests {
         assert!(pattern.is_some());
         assert!(pattern.unwrap().contains("Type"));
         assert!(types.contains(&"mutating".to_string()));
+    }
+
+    #[test]
+    fn test_detect_type_pattern_ignores_file_paths() {
+        let contents = vec![
+            "# T1\n\n**File cần sửa:** `src/app/api/route.ts`\n**Loại:** `mutating`\n"
+                .to_string(),
+            "# T2\n\n**File cần sửa:** `src/lib/ai/digest.ts`\n**Loại:** `read-only`\n"
+                .to_string(),
+        ];
+        let (pattern, types) = detect_type_pattern(&contents);
+        assert!(pattern.is_some());
+        let p = pattern.unwrap();
+        // Should pick Loại, not "File cần sửa" (which has path values)
+        assert!(p.contains("Loại"), "Expected Loại pattern, got: {p}");
+        assert!(types.contains(&"mutating".to_string()));
+    }
+
+    #[test]
+    fn test_detect_type_pattern_no_categorical_field() {
+        // Only file path fields, no type field → should return None
+        let contents = vec![
+            "# T1\n\n**File:** `src/foo.ts`\n".to_string(),
+            "# T2\n\n**File:** `src/bar.ts`\n".to_string(),
+        ];
+        let (pattern, _) = detect_type_pattern(&contents);
+        assert!(pattern.is_none());
     }
 
     #[test]
