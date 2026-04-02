@@ -227,8 +227,17 @@ fn detect_type_pattern(contents: &[String]) -> (String, Vec<String>) {
         .iter()
         .filter(|(_, vals)| {
             let unique: std::collections::HashSet<_> = vals.iter().collect();
-            let has_paths = vals.iter().any(|v| v.contains('/') || v.contains('\\'));
-            unique.len() <= 10 && vals.len() >= contents.len() / 2 && !has_paths
+            let is_categorical = vals.iter().all(|v| {
+                // Type/category values are short, simple words (e.g. "mutating", "read-only")
+                // Filter out: file paths, shell commands, long strings
+                v.len() <= 30
+                    && !v.contains('/')
+                    && !v.contains('\\')
+                    && !v.contains('|')
+                    && !v.contains('(')
+                    && !v.contains('$')
+            });
+            unique.len() <= 10 && vals.len() >= contents.len() / 2 && is_categorical
         })
         .max_by_key(|(_, vals)| vals.len())
     {
