@@ -11,6 +11,7 @@
 src/
 ├── main.rs          — Entry point: CLI arg parsing + orchestration (async)
 ├── config.rs        — Load .docs-gate.toml, defaults, validation
+├── init.rs          — Project scanner: detect docs structure → generate config
 ├── watch.rs         — Watch mode: file watcher + re-run loop
 ├── mcp/
 │   ├── mod.rs       — MCP module entry point
@@ -19,9 +20,9 @@ src/
 ├── checks/
 │   ├── mod.rs       — CheckResult type + run_all_checks() + run_all_checks_extended()
 │   ├── changelog.rs — Check CHANGELOG.md has recent entry
-│   ├── architecture.rs — Check ARCHITECTURE.md 9 sections + non-empty 7,8,9
+│   ├── architecture.rs — Check ARCHITECTURE.md (configurable sections, can be disabled)
 │   ├── discovery.rs — Check Discovery Report format (4 required sections)
-│   └── ticket.rs    — Check ticket files have valid Type declarations
+│   └── ticket.rs    — Check ticket files (configurable type pattern)
 └── output.rs        — Format results: human-readable + exit code
 ```
 
@@ -33,7 +34,7 @@ src/
 // main.rs
 async fn main() -> ExitCode  // #[tokio::main(flavor = "current_thread")]
   // Parse CLI args (clap) → load config → route by flags → exit
-  // Subcommand: check-discovery <file>
+  // Subcommand: check-discovery <file>, init, serve
   // Flags: --all (includes ticket checks), --watch (watch mode)
 
 // watch.rs
@@ -57,20 +58,29 @@ pub fn resolve_config(base: &Config, docs_dir: Option<String>) -> Config
 
 // config.rs
 pub struct Config {
-    pub docs_dir: PathBuf,          // default: "docs"
-    pub changelog: String,          // default: "CHANGELOG.md"
-    pub architecture: String,       // default: "ARCHITECTURE.md"
-    pub required_sections: usize,   // default: 9
-    pub required_non_empty: Vec<usize>, // default: [7, 8, 9]
+    pub docs_dir: PathBuf,              // default: "docs"
+    pub changelog: String,              // default: "CHANGELOG.md"
     pub changelog_max_age_days: u32,    // default: 1
-    pub ticket: TicketConfig,       // nested [ticket] section
+    pub architecture: ArchitectureConfig,
+    pub ticket: TicketConfig,
+}
+pub struct ArchitectureConfig {
+    pub enabled: bool,                  // default: true — set false to skip
+    pub file: String,                   // default: "ARCHITECTURE.md"
+    pub required_sections: usize,       // default: 9
+    pub required_non_empty: Vec<usize>, // default: [7, 8, 9]
 }
 pub struct TicketConfig {
-    pub ticket_dir: PathBuf,        // default: "docs/ticket"
-    pub valid_types: Vec<String>,   // default: ["read-only", "mutating", "destructive"]
-    pub exclude_files: Vec<String>, // default: ["TEMPLATE.md"]
+    pub ticket_dir: PathBuf,            // default: "docs/ticket"
+    pub type_pattern: Option<String>,   // default: Some("\\*\\*Type:\\*\\*...")  — None = skip type check
+    pub valid_types: Vec<String>,       // default: ["read-only", "mutating", "destructive"]
+    pub exclude_files: Vec<String>,     // default: ["TEMPLATE.md"]
 }
 pub fn load_config(path: Option<&Path>) -> Config
+
+// init.rs
+pub fn scan_project(root: &Path) -> Config   // scan project → detect docs structure
+pub fn write_config(root: &Path, config: &Config) -> io::Result<String>  // write .docs-gate.toml
 
 // checks/mod.rs
 pub enum CheckStatus { Pass, Fail(String), Warn(String) }
@@ -104,6 +114,14 @@ CLI args (clap)
   → load_config(.docs-gate.toml hoặc defaults)
   → Route by command/flags:
     ├─ --watch + subcommand → error exit 2
+    ├─ init:
+    │   → scan_project(cwd)
+    │     ├─ detect_docs_dir() → find docs/ or doc/ or documentation/
+    │     ├─ detect_changelog() → find CHANGELOG.md variants
+    │     ├─ detect_architecture() → find ARCHITECTURE.md, count sections
+    │     └─ detect_tickets() → find ticket dir, detect type pattern + excludes
+    │   → write_config() → .docs-gate.toml
+    │   → print summary to stderr, config to stdout
     ├─ serve:
     │   → DocsGateServer::new(config)
     │   → server.serve(rmcp::transport::stdio())
@@ -145,16 +163,18 @@ File: `.docs-gate.toml` (project root, optional)
 |--------|------|---------|-------|
 | `docs_dir` | String | `"docs"` | Thư mục chứa docs |
 | `changelog` | String | `"CHANGELOG.md"` | Tên file changelog |
-| `architecture` | String | `"ARCHITECTURE.md"` | Tên file architecture |
-| `required_sections` | u32 | `9` | Số sections bắt buộc |
-| `required_non_empty` | Array<u32> | `[7, 8, 9]` | Sections phải có content |
 | `changelog_max_age_days` | u32 | `1` | Changelog entry tối đa bao nhiêu ngày |
+| `[architecture].enabled` | bool | `true` | Bật/tắt architecture check |
+| `[architecture].file` | String | `"ARCHITECTURE.md"` | Tên file architecture |
+| `[architecture].required_sections` | u32 | `9` | Số sections bắt buộc |
+| `[architecture].required_non_empty` | Array<u32> | `[7, 8, 9]` | Sections phải có content |
 | `[ticket].ticket_dir` | String | `"docs/ticket"` | Thư mục chứa phiếu |
+| `[ticket].type_pattern` | String? | `"\\*\\*Type:\\*\\*..."` | Regex cho type field (null = skip) |
 | `[ticket].valid_types` | Array<String> | `["read-only", "mutating", "destructive"]` | Các type hợp lệ |
 | `[ticket].exclude_files` | Array<String> | `["TEMPLATE.md"]` | Files bỏ qua khi scan |
 
 Không có file config → dùng defaults. Mọi option đều optional.
-Nested `[ticket]` section: flat keys cũ giữ nguyên, keys mới nằm dưới `[ticket]`.
+`docs-gate init` scan project → auto-generate `.docs-gate.toml` phù hợp.
 
 ---
 
@@ -214,10 +234,18 @@ Nested `[ticket]` section: flat keys cũ giữ nguyên, keys mới nằm dưới
 - **KHÔNG handle:** Discovery Report embedded in larger docs with conflicting headings
 
 ### ticket.rs
-- **Algorithm:** Read ticket_dir → filter *.md, exclude exclude_files → for each: regex match `\*\*Type:\*\*\s*` `` ` `` `([^` `` ` `` `]+)` → validate against valid_types
-- **Regex:** `\*\*Type:\*\*\s*` followed by backtick-wrapped value
+- **Algorithm:** Read ticket_dir → filter *.md, exclude exclude_files → for each: if type_pattern is Some, regex match → validate against valid_types. If type_pattern is None, skip type validation (pass all).
+- **Regex:** Configurable via `ticket.type_pattern`. Default: `\*\*Type:\*\*\s*` followed by backtick-wrapped value
 - **Complexity:** O(n*m) where n = number of files, m = avg file size
 - **KHÔNG handle:** Multiple Type declarations with different values in same file — takes first valid match
+
+### init.rs
+- **Algorithm:** Scan CWD → detect docs dir, changelog, architecture, ticket dir → auto-detect type patterns + excludes → generate Config → write .docs-gate.toml
+- **Type pattern detection:** Try known patterns (Type, Loại, Classification), then generic `**Key:** \`value\`` pattern. Pick pattern matching most files.
+- **Architecture detection:** If file found, count `## N.` sections, set required_sections + required_non_empty. If not found, set enabled=false.
+- **Exclude detection:** Files with "template", "readme", "example", "sample" in name (case-insensitive).
+- **Output:** Summary to stderr, TOML content to stdout. Writes .docs-gate.toml to CWD.
+- **KHÔNG handle:** Non-standard docs layouts. Nested ticket dirs. Multiple architecture files.
 
 ### config.rs
 - **Algorithm:** Check `.docs-gate.toml` exists → parse → merge with defaults
@@ -254,6 +282,7 @@ Nested `[ticket]` section: flat keys cũ giữ nguyên, keys mới nằm dưới
 - **Process model:** Foreground, async (tokio current_thread runtime)
 - **Output:** stdout cho results, stderr cho warnings/errors
 - **Exit codes:** 0 = all pass, 1 = any fail, 2 = config/usage error
+- **Init mode (init):** Scan CWD → detect docs structure → generate .docs-gate.toml → exit. One-time setup.
 - **Default mode:** Parse args → load config → run checks → exit. Nhanh, < 1 giây.
 - **Watch mode (--watch):** Long-running process. Run checks → watch files → re-run on changes → Ctrl+C to exit.
   - Watcher: notify RecommendedWatcher (cross-platform) on docs_dir, + ticket_dir if --all
@@ -286,10 +315,10 @@ Nested `[ticket]` section: flat keys cũ giữ nguyên, keys mới nằm dưới
 - **Vấn đề:** Headings phải exact match (bao gồm dấu tiếng Việt). Typo hoặc format khác bị miss.
 - **Xử lý hiện tại:** Document rõ. Format cố định theo CLAUDE.md template.
 
-### Ticket type regex cứng
-- **Modules liên quan:** checks/ticket.rs
-- **Vấn đề:** Chỉ detect `**Type:** \`value\`` format. Markdown bold + backtick. Format khác bị miss.
-- **Xử lý hiện tại:** Document rõ. Đây là format chuẩn trong hệ thống thợ-thầu.
+### Ticket type regex configurable
+- **Modules liên quan:** checks/ticket.rs, config.rs
+- **Vấn đề:** Type pattern giờ configurable qua `ticket.type_pattern`. Nhưng user vẫn phải cung cấp regex đúng.
+- **Xử lý hiện tại:** `docs-gate init` auto-detect pattern. Nếu không detect được → set None (skip type check).
 
 ### Config file location cố định
 - **Modules liên quan:** config.rs

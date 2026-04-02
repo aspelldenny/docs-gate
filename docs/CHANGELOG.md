@@ -1,5 +1,22 @@
 # CHANGELOG
 
+## [init] Flexible config: `docs-gate init` + configurable checks — 2026-04-02
+- New subcommand: `docs-gate init` — scans project, auto-generates `.docs-gate.toml`
+  - Detects docs dir, changelog, architecture file, ticket dir
+  - Auto-detects type pattern (Type, Loại, Classification, or generic **Key:** `value`)
+  - Auto-detects exclude files (template, readme, example, sample)
+  - Detects architecture sections count + required_non_empty
+- Config restructured: `architecture` is now `[architecture]` section with `enabled` flag
+  - `[architecture].enabled = false` skips architecture check entirely
+  - `[architecture].file` replaces top-level `architecture` key
+  - `[architecture].required_sections` / `required_non_empty` moved from top-level
+- Config: `[ticket].type_pattern` — custom regex for type field detection
+  - `type_pattern = null` → skip type validation entirely
+  - Default: `\*\*Type:\*\*\s*` backtick pattern (backward compatible)
+- New module: `src/init.rs` — project scanner + config generator
+- 8 new tests (init module), updated existing config/architecture/ticket tests
+- Total: 81 tests (61 unit + 11 integration + 9 MCP)
+
 ## [#4-1] Open source release — CI/CD, packaging, docs polish — 2026-04-01
 - Cargo.toml: added package metadata (description, license, repository, keywords, categories, readme)
 - LICENSE: MIT license file created

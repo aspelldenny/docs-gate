@@ -1,22 +1,30 @@
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 #[serde(default)]
 pub struct Config {
     pub docs_dir: PathBuf,
     pub changelog: String,
-    pub architecture: String,
-    pub required_sections: usize,
-    pub required_non_empty: Vec<usize>,
     pub changelog_max_age_days: u32,
+    pub architecture: ArchitectureConfig,
     pub ticket: TicketConfig,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(default)]
+pub struct ArchitectureConfig {
+    pub enabled: bool,
+    pub file: String,
+    pub required_sections: usize,
+    pub required_non_empty: Vec<usize>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
 #[serde(default)]
 pub struct TicketConfig {
     pub ticket_dir: PathBuf,
+    pub type_pattern: Option<String>,
     pub valid_types: Vec<String>,
     pub exclude_files: Vec<String>,
 }
@@ -26,11 +34,20 @@ impl Default for Config {
         Self {
             docs_dir: PathBuf::from("docs"),
             changelog: String::from("CHANGELOG.md"),
-            architecture: String::from("ARCHITECTURE.md"),
+            changelog_max_age_days: 1,
+            architecture: ArchitectureConfig::default(),
+            ticket: TicketConfig::default(),
+        }
+    }
+}
+
+impl Default for ArchitectureConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            file: String::from("ARCHITECTURE.md"),
             required_sections: 9,
             required_non_empty: vec![7, 8, 9],
-            changelog_max_age_days: 1,
-            ticket: TicketConfig::default(),
         }
     }
 }
@@ -39,6 +56,7 @@ impl Default for TicketConfig {
     fn default() -> Self {
         Self {
             ticket_dir: PathBuf::from("docs/ticket"),
+            type_pattern: Some(String::from(r"\*\*Type:\*\*\s*`([^`]+)`")),
             valid_types: vec![
                 String::from("read-only"),
                 String::from("mutating"),
@@ -83,11 +101,13 @@ mod tests {
         let config = Config::default();
         assert_eq!(config.docs_dir, PathBuf::from("docs"));
         assert_eq!(config.changelog, "CHANGELOG.md");
-        assert_eq!(config.architecture, "ARCHITECTURE.md");
-        assert_eq!(config.required_sections, 9);
-        assert_eq!(config.required_non_empty, vec![7, 8, 9]);
+        assert!(config.architecture.enabled);
+        assert_eq!(config.architecture.file, "ARCHITECTURE.md");
+        assert_eq!(config.architecture.required_sections, 9);
+        assert_eq!(config.architecture.required_non_empty, vec![7, 8, 9]);
         assert_eq!(config.changelog_max_age_days, 1);
         assert_eq!(config.ticket.ticket_dir, PathBuf::from("docs/ticket"));
+        assert!(config.ticket.type_pattern.is_some());
         assert_eq!(
             config.ticket.valid_types,
             vec!["read-only", "mutating", "destructive"]
@@ -98,7 +118,7 @@ mod tests {
     #[test]
     fn test_load_config_no_file() {
         let config = load_config(Some(Path::new("/tmp/nonexistent-docs-gate.toml")));
-        assert_eq!(config.required_sections, 9);
+        assert_eq!(config.architecture.required_sections, 9);
     }
 
     #[test]
@@ -107,13 +127,25 @@ mod tests {
         let path = dir.path().join(".docs-gate.toml");
         let mut f = std::fs::File::create(&path).unwrap();
         writeln!(f, "docs_dir = \"documentation\"").unwrap();
+        writeln!(f, "[architecture]").unwrap();
         writeln!(f, "required_sections = 5").unwrap();
 
         let config = load_config(Some(&path));
         assert_eq!(config.docs_dir, PathBuf::from("documentation"));
-        assert_eq!(config.required_sections, 5);
-        // defaults for unset fields
+        assert_eq!(config.architecture.required_sections, 5);
         assert_eq!(config.changelog, "CHANGELOG.md");
+    }
+
+    #[test]
+    fn test_load_config_architecture_disabled() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join(".docs-gate.toml");
+        let mut f = std::fs::File::create(&path).unwrap();
+        writeln!(f, "[architecture]").unwrap();
+        writeln!(f, "enabled = false").unwrap();
+
+        let config = load_config(Some(&path));
+        assert!(!config.architecture.enabled);
     }
 
     #[test]
@@ -125,12 +157,29 @@ mod tests {
         writeln!(f, "[ticket]").unwrap();
         writeln!(f, "ticket_dir = \"custom/tickets\"").unwrap();
         writeln!(f, "exclude_files = [\"TEMPLATE.md\", \"DRAFT.md\"]").unwrap();
+        writeln!(f, r#"type_pattern = '\*\*Loại:\*\*\s*`([^`]+)`'"#).unwrap();
 
         let config = load_config(Some(&path));
         assert_eq!(config.ticket.ticket_dir, PathBuf::from("custom/tickets"));
         assert_eq!(config.ticket.exclude_files, vec!["TEMPLATE.md", "DRAFT.md"]);
-        // flat keys still work
+        assert_eq!(
+            config.ticket.type_pattern.as_deref(),
+            Some(r"\*\*Loại:\*\*\s*`([^`]+)`")
+        );
         assert_eq!(config.docs_dir, PathBuf::from("docs"));
+    }
+
+    #[test]
+    fn test_load_config_ticket_no_type_pattern() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join(".docs-gate.toml");
+        let mut f = std::fs::File::create(&path).unwrap();
+        writeln!(f, "[ticket]").unwrap();
+        writeln!(f, "ticket_dir = \"docs/ticket\"").unwrap();
+
+        let config = load_config(Some(&path));
+        // When ticket section exists but type_pattern not set, uses default
+        assert!(config.ticket.type_pattern.is_some());
     }
 
     #[test]
@@ -141,7 +190,6 @@ mod tests {
         writeln!(f, "docs_dir = \"docs\"").unwrap();
 
         let config = load_config(Some(&path));
-        // ticket defaults
         assert_eq!(config.ticket.ticket_dir, PathBuf::from("docs/ticket"));
         assert_eq!(
             config.ticket.valid_types,
@@ -156,7 +204,6 @@ mod tests {
         std::fs::write(&path, "invalid = [[[").unwrap();
 
         let config = load_config(Some(&path));
-        // should fall back to defaults
-        assert_eq!(config.required_sections, 9);
+        assert_eq!(config.architecture.required_sections, 9);
     }
 }
