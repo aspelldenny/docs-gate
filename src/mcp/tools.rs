@@ -28,6 +28,7 @@ pub fn resolve_config(base: &Config, docs_dir: Option<String>) -> Config {
         ticket: crate::config::TicketConfig {
             ticket_dir: base.ticket.ticket_dir.clone(),
             type_pattern: base.ticket.type_pattern.clone(),
+
             valid_types: base.ticket.valid_types.clone(),
             exclude_files: base.ticket.exclude_files.clone(),
         },

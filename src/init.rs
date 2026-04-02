@@ -129,7 +129,7 @@ fn detect_tickets(docs_dir: &Path) -> TicketConfig {
                 .parent()
                 .map(|p| p.join("ticket"))
                 .unwrap_or(ticket_dir),
-            type_pattern: None,
+            type_pattern: String::new(),
             valid_types: vec![],
             exclude_files: vec![],
         };
@@ -174,10 +174,10 @@ fn detect_tickets(docs_dir: &Path) -> TicketConfig {
 }
 
 /// Scan ticket contents to find the most common bold-key-backtick pattern.
-/// Returns (pattern, collected_values).
-fn detect_type_pattern(contents: &[String]) -> (Option<String>, Vec<String>) {
+/// Returns (pattern, collected_values). Empty string = no pattern found.
+fn detect_type_pattern(contents: &[String]) -> (String, Vec<String>) {
     if contents.is_empty() {
-        return (None, vec![]);
+        return (String::new(), vec![]);
     }
 
     // Try common patterns: **Key:** `value`
@@ -238,7 +238,7 @@ fn detect_type_pattern(contents: &[String]) -> (Option<String>, Vec<String>) {
             let unique: std::collections::HashSet<_> = values.iter().collect();
             let mut sorted: Vec<String> = unique.into_iter().cloned().collect();
             sorted.sort();
-            return (Some(pattern), sorted);
+            return (pattern, sorted);
         }
     }
 
@@ -247,9 +247,9 @@ fn detect_type_pattern(contents: &[String]) -> (Option<String>, Vec<String>) {
             let unique: std::collections::HashSet<_> = values.iter().collect();
             let mut sorted: Vec<String> = unique.into_iter().cloned().collect();
             sorted.sort();
-            (Some(pattern.to_string()), sorted)
+            (pattern.to_string(), sorted)
         }
-        None => (None, vec![]),
+        None => (String::new(), vec![]),
     }
 }
 
@@ -308,9 +308,8 @@ mod tests {
         writeln!(f, "# Phiếu 2\n\n**Loại:** `read-only`\n").unwrap();
 
         let config = scan_project(dir.path());
-        assert!(config.ticket.type_pattern.is_some());
-        let pattern = config.ticket.type_pattern.unwrap();
-        assert!(pattern.contains("Loại"));
+        assert!(!config.ticket.type_pattern.is_empty());
+        assert!(config.ticket.type_pattern.contains("Loại"));
         assert!(config.ticket.valid_types.contains(&"mutating".to_string()));
         assert!(config.ticket.valid_types.contains(&"read-only".to_string()));
     }
@@ -349,7 +348,7 @@ mod tests {
         fs::File::create(docs.join("CHANGELOG.md")).unwrap();
 
         let config = scan_project(dir.path());
-        assert!(config.ticket.type_pattern.is_none());
+        assert!(config.ticket.type_pattern.is_empty());
         assert!(config.ticket.valid_types.is_empty());
     }
 
@@ -369,8 +368,8 @@ mod tests {
             "# T2\n\n**Type:** `read-only`\n".to_string(),
         ];
         let (pattern, types) = detect_type_pattern(&contents);
-        assert!(pattern.is_some());
-        assert!(pattern.unwrap().contains("Type"));
+        assert!(!pattern.is_empty());
+        assert!(pattern.contains("Type"));
         assert!(types.contains(&"mutating".to_string()));
     }
 
@@ -381,10 +380,12 @@ mod tests {
             "# T2\n\n**File cần sửa:** `src/lib/ai/digest.ts`\n**Loại:** `read-only`\n".to_string(),
         ];
         let (pattern, types) = detect_type_pattern(&contents);
-        assert!(pattern.is_some());
-        let p = pattern.unwrap();
+        assert!(!pattern.is_empty());
         // Should pick Loại, not "File cần sửa" (which has path values)
-        assert!(p.contains("Loại"), "Expected Loại pattern, got: {p}");
+        assert!(
+            pattern.contains("Loại"),
+            "Expected Loại pattern, got: {pattern}"
+        );
         assert!(types.contains(&"mutating".to_string()));
     }
 
@@ -396,13 +397,13 @@ mod tests {
             "# T2\n\n**File:** `src/bar.ts`\n".to_string(),
         ];
         let (pattern, _) = detect_type_pattern(&contents);
-        assert!(pattern.is_none());
+        assert!(pattern.is_empty());
     }
 
     #[test]
     fn test_detect_type_pattern_empty() {
         let (pattern, types) = detect_type_pattern(&[]);
-        assert!(pattern.is_none());
+        assert!(pattern.is_empty());
         assert!(types.is_empty());
     }
 }

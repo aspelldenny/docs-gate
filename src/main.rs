@@ -77,7 +77,7 @@ async fn main() -> ExitCode {
                         eprintln!("  ✗ Architecture: disabled (no file found)");
                     }
                     eprintln!("  ✓ Changelog: {}", config.changelog);
-                    if config.ticket.type_pattern.is_some() {
+                    if !config.ticket.type_pattern.is_empty() {
                         eprintln!(
                             "  ✓ Tickets: {} (types: {})",
                             config.ticket.ticket_dir.display(),
