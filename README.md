@@ -1,90 +1,110 @@
 # docs-gate
 
+**Docs compliance checks before every commit.**
+
 [![CI](https://github.com/aspelldenny/docs-gate/actions/workflows/ci.yml/badge.svg)](https://github.com/aspelldenny/docs-gate/actions/workflows/ci.yml)
-[![Crates.io](https://img.shields.io/crates/v/docs-gate)](https://crates.io/crates/docs-gate)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-CLI tool to check docs compliance before commit. Designed for projects using structured markdown documentation (CHANGELOG.md + ARCHITECTURE.md).
+A Rust CLI that enforces documentation standards in projects using structured
+markdown. Checks that your CHANGELOG.md has recent entries, your ARCHITECTURE.md
+has required sections, your tickets have valid types, and your Discovery Reports
+follow the expected format. Single binary, zero runtime dependencies.
 
-Written in Rust. Single binary, zero runtime dependencies.
+---
 
 ## Install
 
 ```bash
-# From crates.io (available after publish)
-cargo install docs-gate
+cargo install --git https://github.com/aspelldenny/docs-gate
+```
 
-# From source
+Or from source:
+
+```bash
+git clone https://github.com/aspelldenny/docs-gate.git
+cd docs-gate
 cargo install --path .
 ```
 
-## Usage
+## Quick start
 
 ```bash
-# Run checks with defaults (looks for docs/ directory)
+# Run core checks (changelog + architecture)
 docs-gate
 
-# Show all results including passes
-docs-gate --verbose
+# Run all checks including ticket type validation
+docs-gate --all
 
-# Use custom config file
-docs-gate --config path/to/.docs-gate.toml
+# Auto-generate config from your project layout
+docs-gate init
 ```
 
-### Output
+## Commands
 
-```
-✅ PASS: changelog
-✅ PASS: architecture-section-count
-✅ PASS: architecture-section-7
-✅ PASS: architecture-section-8
-✅ PASS: architecture-section-9
+| Command | Description |
+|---------|-------------|
+| *(default)* | Run core checks (changelog + architecture) |
+| `check-discovery <file>` | Validate Discovery Report format in a file |
+| `serve` | Start MCP server on stdio transport |
+| `init` | Scan project and generate `.docs-gate.toml` |
 
-✅ All checks passed (5/5)
-```
+## Flags
 
-### Exit codes
+| Flag | Description |
+|------|-------------|
+| `--all` | Include ticket type checks |
+| `--watch` | Re-run checks on file changes (Ctrl+C to exit) |
+| `--verbose` | Show passing checks in output |
+| `--config <path>` | Path to config file |
+
+## Checks
+
+| Check | What it verifies |
+|-------|-----------------|
+| `changelog` | CHANGELOG.md has a recent entry (date + content) |
+| `architecture-section-count` | ARCHITECTURE.md has the required number of sections |
+| `architecture-section-{N}` | Specified sections are non-empty |
+| `ticket-type` | Ticket files contain a valid type classification |
+| `discovery` | Discovery Report follows the expected 4-section format |
+
+## Exit codes
 
 | Code | Meaning |
 |------|---------|
 | 0 | All checks passed |
 | 1 | One or more checks failed |
+| 2 | Usage error |
 
-### Extended Checks
+## Configuration
 
-```bash
-# Run all checks including ticket type validation
-docs-gate --all
+Optional `.docs-gate.toml` in project root. Run `docs-gate init` to generate one automatically.
 
-# Check a specific file for Discovery Report format
-docs-gate check-discovery path/to/report.md
+```toml
+docs_dir = "docs"
+changelog = "CHANGELOG.md"
+architecture = "ARCHITECTURE.md"
+required_sections = 9
+required_non_empty = [7, 8, 9]
+changelog_max_age_days = 1
+
+[ticket]
+ticket_dir = "docs/ticket"
+valid_types = ["read-only", "mutating", "destructive"]
+exclude_files = ["TEMPLATE.md"]
 ```
 
-### Watch Mode
+All fields are optional. Without a config file, sensible defaults apply.
 
-Re-run checks automatically when files change:
+## MCP server
 
-```bash
-# Watch docs directory, re-run on changes
-docs-gate --watch
-
-# Watch docs + ticket directory
-docs-gate --watch --all
-```
-
-Press `Ctrl+C` to exit watch mode.
-
-### MCP Server Mode
-
-Start an [MCP](https://modelcontextprotocol.io/) server on stdio transport, allowing AI assistants to run docs checks:
+docs-gate can run as an [MCP](https://modelcontextprotocol.io/) server,
+letting AI assistants call docs checks as tools.
 
 ```bash
 docs-gate serve
 ```
 
-#### Claude Desktop Configuration
-
-Add to your `claude_desktop_config.json`:
+Add to `claude_desktop_config.json`:
 
 ```json
 {
@@ -98,18 +118,9 @@ Add to your `claude_desktop_config.json`:
 }
 ```
 
-See `examples/claude_desktop_config.json` for a ready-to-use template.
+Available MCP tools: `check_changelog`, `check_architecture`, `check_discovery`, `check_all`.
 
-#### Available MCP Tools
-
-| Tool | Parameters | Description |
-|------|-----------|-------------|
-| `check_changelog` | `docs_dir` (optional) | Check CHANGELOG.md has a recent entry |
-| `check_architecture` | `docs_dir` (optional) | Check ARCHITECTURE.md 9 sections + non-empty 7,8,9 |
-| `check_discovery` | `file_path` (required) | Check Discovery Report format in a file |
-| `check_all` | `docs_dir` (optional) | Run all checks (changelog + architecture + tickets) |
-
-### Use as git hook
+## Git hook
 
 ```bash
 # .git/hooks/pre-commit
@@ -117,43 +128,16 @@ See `examples/claude_desktop_config.json` for a ready-to-use template.
 docs-gate
 ```
 
-## Checks
+## Requirements
 
-| Check | What it does |
-|-------|-------------|
-| changelog | Verify CHANGELOG.md has a recent entry (date within N days, with content) |
-| architecture-section-count | Verify ARCHITECTURE.md has required number of sections |
-| architecture-section-{N} | Verify required sections are not empty |
+- Rust 1.85+ (edition 2024)
 
-## Config
+## Status
 
-Optional `.docs-gate.toml` in project root:
-
-```toml
-docs_dir = "docs"                # Directory containing docs (default: "docs")
-changelog = "CHANGELOG.md"       # Changelog filename (default: "CHANGELOG.md")
-architecture = "ARCHITECTURE.md" # Architecture filename (default: "ARCHITECTURE.md")
-required_sections = 9            # Required section count (default: 9)
-required_non_empty = [7, 8, 9]   # Sections that must have content (default: [7, 8, 9])
-changelog_max_age_days = 1       # Max age of latest changelog entry in days (default: 1)
-```
-
-### Ticket Config
-
-Nested `[ticket]` section for ticket type validation (used with `--all` flag):
-
-```toml
-[ticket]
-ticket_dir = "docs/ticket"                          # Directory containing ticket files (default: "docs/ticket")
-valid_types = ["read-only", "mutating", "destructive"]  # Accepted type values (default shown)
-exclude_files = ["TEMPLATE.md"]                      # Files to skip when scanning (default: ["TEMPLATE.md"])
-```
-
-All options are optional. Without a config file, sensible defaults are used.
+v0.1 -- functional and tested, used in production workflows. API may evolve.
 
 ## Contributing
 
-Contributions welcome! Please:
 1. Fork the repo
 2. Create a feature branch
 3. Run `cargo test && cargo clippy -- -D warnings` before submitting
@@ -161,4 +145,4 @@ Contributions welcome! Please:
 
 ## License
 
-MIT
+MIT -- see [LICENSE](LICENSE).
