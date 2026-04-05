@@ -1,0 +1,30 @@
+name = "docs-gate"
+stack = "rust"
+base_branch = "main"
+
+[test]
+command = "cargo test"
+timeout_secs = 300
+
+[docs_gate]
+enabled = true
+blocking = true
+
+[version]
+file = "Cargo.toml"
+strategy = "auto"
+
+[changelog]
+file = "docs/CHANGELOG.md"
+style = "grouped"
+
+[pr]
+template = "default"
+draft = false
+
+[deploy]
+provider = "cargo"
+
+[learn]
+dir = "~/.ship/learnings"
+project_dir = ".ship/learnings"
