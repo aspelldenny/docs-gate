@@ -206,12 +206,13 @@ fn test_mcp_tools_list() {
     let tools = resp["result"]["tools"]
         .as_array()
         .expect("tools should be array");
-    assert_eq!(tools.len(), 4);
+    assert_eq!(tools.len(), 5);
 
     let names: Vec<&str> = tools.iter().map(|t| t["name"].as_str().unwrap()).collect();
     assert!(names.contains(&"check_changelog"));
     assert!(names.contains(&"check_architecture"));
     assert!(names.contains(&"check_discovery"));
+    assert!(names.contains(&"check_staged"));
     assert!(names.contains(&"check_all"));
 
     session.shutdown();

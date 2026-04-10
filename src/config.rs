@@ -9,6 +9,49 @@ pub struct Config {
     pub changelog_max_age_days: u32,
     pub architecture: ArchitectureConfig,
     pub ticket: TicketConfig,
+    /// Require CHANGELOG in every staged commit (not just "recent entry")
+    #[serde(default = "default_true")]
+    pub changelog_staged: bool,
+    /// File-to-docs mapping rules: if watched file is staged, required doc must also be staged
+    #[serde(default)]
+    pub rules: Vec<RuleConfig>,
+    /// Staleness checks: warn when a file hasn't been updated in N commits
+    #[serde(default)]
+    pub staleness: Vec<StalenessConfig>,
+}
+
+fn default_true() -> bool {
+    true
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct RuleConfig {
+    /// Glob pattern for source files to watch (e.g. "src/lib/ai/prompts.ts", "src/app/api/**/*.ts")
+    pub watch: String,
+    /// Doc file that must be updated when watched files change (e.g. "docs/PROMPTS.md")
+    pub requires: String,
+    /// Optional human-readable message on failure
+    pub message: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct StalenessConfig {
+    /// File to monitor for staleness (e.g. "CLAUDE.md", "docs/PROJECT.md")
+    pub file: String,
+    /// Max commits since last update before triggering (default 20)
+    #[serde(default = "default_max_commits")]
+    pub max_commits: u32,
+    /// "warn" (default) or "fail"
+    #[serde(default = "default_warn")]
+    pub level: String,
+}
+
+fn default_max_commits() -> u32 {
+    20
+}
+
+fn default_warn() -> String {
+    String::from("warn")
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -37,6 +80,9 @@ impl Default for Config {
             changelog_max_age_days: 1,
             architecture: ArchitectureConfig::default(),
             ticket: TicketConfig::default(),
+            changelog_staged: true,
+            rules: Vec::new(),
+            staleness: Vec::new(),
         }
     }
 }
@@ -113,6 +159,8 @@ mod tests {
             vec!["read-only", "mutating", "destructive"]
         );
         assert_eq!(config.ticket.exclude_files, vec!["TEMPLATE.md"]);
+        assert!(config.changelog_staged);
+        assert!(config.rules.is_empty());
     }
 
     #[test]
