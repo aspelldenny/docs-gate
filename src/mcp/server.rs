@@ -58,7 +58,16 @@ impl DocsGateServer {
         serde_json::to_string_pretty(&results).unwrap()
     }
 
-    /// Run all checks: changelog + architecture + tickets. Use this before every commit.
+    /// Check git staged files: CHANGELOG must be staged with code changes, and file-to-docs rules must be satisfied
+    #[tool(name = "check_staged")]
+    fn check_staged(&self, Parameters(params): Parameters<DocsDirParam>) -> String {
+        let config = tools::resolve_config(&self.config, params.docs_dir);
+        let mut results = vec![checks::staged::check_changelog_staged(&config)];
+        results.extend(checks::staged::check_rules(&config));
+        serde_json::to_string_pretty(&results).unwrap()
+    }
+
+    /// Run all checks: changelog + architecture + staged + rules + tickets. Use this before every commit.
     #[tool(name = "check_all")]
     fn check_all(&self, Parameters(params): Parameters<DocsDirParam>) -> String {
         let config = tools::resolve_config(&self.config, params.docs_dir);
@@ -132,15 +141,16 @@ mod tests {
     }
 
     #[test]
-    fn test_tool_router_has_4_tools() {
+    fn test_tool_router_has_5_tools() {
         let server = DocsGateServer::new(Config::default());
         let tools = server.tool_router.list_all();
         let names: Vec<String> = tools.iter().map(|t| t.name.to_string()).collect();
         assert!(names.contains(&"check_changelog".to_string()));
         assert!(names.contains(&"check_architecture".to_string()));
         assert!(names.contains(&"check_discovery".to_string()));
+        assert!(names.contains(&"check_staged".to_string()));
         assert!(names.contains(&"check_all".to_string()));
-        assert_eq!(tools.len(), 4);
+        assert_eq!(tools.len(), 5);
     }
 
     #[test]

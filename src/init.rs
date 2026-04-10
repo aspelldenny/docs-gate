@@ -24,6 +24,9 @@ pub fn scan_project(root: &Path) -> Config {
         changelog_max_age_days: 1,
         architecture,
         ticket,
+        changelog_staged: true,
+        rules: Vec::new(),
+        staleness: Vec::new(),
     }
 }
 
