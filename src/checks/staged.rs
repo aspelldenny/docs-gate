@@ -108,10 +108,7 @@ pub fn check_changelog_staged(config: &Config) -> CheckResult {
 
     // Check if any staged file is a code file (not just docs)
     let has_code_changes = staged.iter().any(|f| {
-        !f.starts_with("docs/")
-            && !f.starts_with(".")
-            && f != "CLAUDE.md"
-            && f != "README.md"
+        !f.starts_with("docs/") && !f.starts_with(".") && f != "CLAUDE.md" && f != "README.md"
     });
 
     if !has_code_changes {
@@ -308,16 +305,18 @@ mod tests {
         .into_iter()
         .collect();
         assert!(glob_matches_any("src/app/api/**/*.ts", &files));
-        assert!(!glob_matches_any("src/app/api/**/*.ts", &HashSet::from(["src/components/ui/Toast.tsx".to_string()])));
+        assert!(!glob_matches_any(
+            "src/app/api/**/*.ts",
+            &HashSet::from(["src/components/ui/Toast.tsx".to_string()])
+        ));
     }
 
     #[test]
     fn test_glob_double_star_components() {
-        let files: HashSet<String> = vec![
-            "src/components/journey/MonthlyPortraitWidget.tsx".to_string(),
-        ]
-        .into_iter()
-        .collect();
+        let files: HashSet<String> =
+            vec!["src/components/journey/MonthlyPortraitWidget.tsx".to_string()]
+                .into_iter()
+                .collect();
         assert!(glob_matches_any("src/components/**/*.tsx", &files));
     }
 
