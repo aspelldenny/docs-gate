@@ -28,3 +28,6 @@ provider = "cargo"
 [learn]
 dir = "~/.ship/learnings"
 project_dir = ".ship/learnings"
+
+[obsidian]
+auto_log = true
