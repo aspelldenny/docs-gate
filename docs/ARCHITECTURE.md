@@ -20,8 +20,11 @@ src/
 ├── checks/
 │   ├── mod.rs       — CheckResult type + run_all_checks() + run_all_checks_extended()
 │   ├── changelog.rs — Check CHANGELOG.md has recent entry
-│   ├── architecture.rs — Check ARCHITECTURE.md (configurable sections, can be disabled)
+│   ├── architecture.rs — Check ARCHITECTURE.md + [[doc_structure]] entries
+│   ├── count.rs     — Check [[count_check]] entries (doc number vs command output)
+│   ├── cross_doc.rs — Check [[cross_doc]] entries (subset relationship between docs)
 │   ├── discovery.rs — Check Discovery Report format (4 required sections)
+│   ├── staged.rs    — Git-aware: changelog-staged + file-to-docs rules + staleness
 │   └── ticket.rs    — Check ticket files (configurable type pattern)
 └── output.rs        — Format results: human-readable + exit code
 ```
@@ -71,6 +74,8 @@ pub struct Config {
     pub rules: Vec<RuleConfig>,         // default: []
     pub staleness: Vec<StalenessConfig>,// default: []
     pub doc_structure: Vec<DocStructureConfig>, // default: [] — extra structural checks
+    pub count_check: Vec<CountCheckConfig>,      // default: [] — drift checks (doc vs command)
+    pub cross_doc: Vec<CrossDocConfig>,          // default: [] — cross-doc subset checks
 }
 pub struct ArchitectureConfig {
     pub enabled: bool,                  // default: true — set false to skip
@@ -82,6 +87,20 @@ pub struct DocStructureConfig {
     pub file: String,                   // path relative to docs_dir
     pub required_sections: usize,
     pub required_non_empty: Vec<usize>, // default: []
+}
+pub struct CountCheckConfig {
+    pub file: String,                   // doc with hardcoded number
+    pub doc_pattern: String,            // regex w/ capture group → number in doc
+    pub command: String,                // shell command (sh -c on Unix, cmd /C on Windows)
+    pub command_pattern: String,        // regex w/ capture group → number in command stdout
+    pub description: String,            // default: "" — human label for error message
+}
+pub struct CrossDocConfig {
+    pub source: String,                 // doc that declares the canonical set
+    pub source_pattern: String,         // regex w/ capture group → values in source
+    pub target: String,                 // doc that must contain those values
+    pub target_pattern: String,         // regex w/ capture group → values in target
+    pub description: String,            // default: ""
 }
 pub struct TicketConfig {
     pub ticket_dir: PathBuf,            // default: "docs/ticket"
@@ -108,6 +127,12 @@ pub fn check_changelog(config: &Config) -> CheckResult
 pub fn check_doc_file(path: &Path, required_sections: usize, required_non_empty: &[usize], name_prefix: &str) -> Vec<CheckResult>
 pub fn check_architecture(config: &Config) -> Vec<CheckResult>
 pub fn check_doc_structure(config: &Config) -> Vec<CheckResult>  // iterates [[doc_structure]] entries
+
+// checks/count.rs
+pub fn check_counts(config: &Config) -> Vec<CheckResult>  // iterates [[count_check]] entries
+
+// checks/cross_doc.rs
+pub fn check_cross_doc(config: &Config) -> Vec<CheckResult>  // iterates [[cross_doc]] entries
 
 // checks/discovery.rs
 pub fn check_discovery(file_path: &Path) -> Vec<CheckResult>
@@ -165,9 +190,19 @@ CLI args (clap)
           ├─ check_architecture()
           │   → Read file → parse ## headings → count sections
           │   → Check sections 7,8,9 not empty
-          └─ check_doc_structure()
-              → For each [[doc_structure]] entry: same logic as architecture
-              → No-op when array is empty (default)
+          ├─ check_doc_structure()
+          │   → For each [[doc_structure]] entry: same logic as architecture
+          │   → No-op when array is empty (default)
+          ├─ check_changelog_staged() + check_rules() + check_staleness()
+          ├─ check_counts()
+          │   → For each [[count_check]] entry: extract number from doc
+          │   → Run command via sh -c (or cmd /C on Windows), parse stdout
+          │   → Compare numbers; fail if mismatch
+          │   → No-op when array is empty
+          └─ check_cross_doc()
+              → For each [[cross_doc]] entry: extract values from source + target
+              → Verify target ⊇ source; fail with missing-values list (cap 5)
+              → No-op when array is empty
         → format_results() → stdout
         → exit_code() → 0 (all pass) hoặc 1 (any fail)
 ```
@@ -194,6 +229,16 @@ File: `.docs-gate.toml` (project root, optional)
 | `[[doc_structure]].file` | String | (none) | Path tới doc file cần check structure (relative docs_dir) |
 | `[[doc_structure]].required_sections` | u32 | (none) | Số sections bắt buộc cho file đó |
 | `[[doc_structure]].required_non_empty` | Array<u32> | `[]` | Sections phải có content |
+| `[[count_check]].file` | String | (none) | Doc chứa số hardcoded |
+| `[[count_check]].doc_pattern` | String | (none) | Regex (capture group 1) trích số từ doc |
+| `[[count_check]].command` | String | (none) | Shell command để lấy số thực tế |
+| `[[count_check]].command_pattern` | String | (none) | Regex (capture group 1) parse stdout |
+| `[[count_check]].description` | String | `""` | Label trong error message |
+| `[[cross_doc]].source` | String | (none) | Doc khai báo set giá trị chính thức |
+| `[[cross_doc]].source_pattern` | String | (none) | Regex (capture group 1) trích values từ source |
+| `[[cross_doc]].target` | String | (none) | Doc phải chứa tất cả values từ source |
+| `[[cross_doc]].target_pattern` | String | (none) | Regex (capture group 1) trích values từ target |
+| `[[cross_doc]].description` | String | `""` | Label trong error message |
 
 Không có file config → dùng defaults. Mọi option đều optional.
 `docs-gate init` scan project → auto-generate `.docs-gate.toml` phù hợp.
@@ -225,11 +270,18 @@ Không có file config → dùng defaults. Mọi option đều optional.
 | File không tồn tại | CheckStatus::Fail("File not found: {path}") |
 | File không đọc được | CheckStatus::Fail("Cannot read: {path}: {error}") |
 | Config parse error | Stderr warning, dùng defaults |
-| Invalid regex | Panic (bug, không phải user error) |
+| Invalid regex (architecture) | Panic (bug, không phải user error) |
+| Invalid regex (count/cross_doc user pattern) | CheckStatus::Fail("Invalid {kind}_pattern regex: {error}") |
 | Section heading parse fail | Skip section, count as missing |
 | Ticket dir không tồn tại | CheckStatus::Warn("Ticket directory not found: {path}") |
 | Ticket file thiếu Type | CheckStatus::Fail("{filename}: missing Type declaration") |
 | Ticket type không hợp lệ | CheckStatus::Fail("{filename}: invalid type '{value}'") |
+| count_check command spawn fail | CheckStatus::Fail("Failed to run command: {error}") |
+| count_check command non-zero exit | CheckStatus::Fail("Command failed with exit {code}: {stderr}") |
+| count_check capture non-numeric | CheckStatus::Fail("{kind}_pattern captured non-numeric value: {value}") |
+| count_check pattern miss | CheckStatus::Fail("{kind}_pattern did not match in {target}") |
+| cross_doc source matches nothing | CheckStatus::Warn("source_pattern matched nothing in {source}") |
+| cross_doc target missing values | CheckStatus::Fail("{label}: target missing values from source: {list}{ and N more}") |
 
 ---
 
@@ -277,6 +329,22 @@ Không có file config → dùng defaults. Mọi option đều optional.
 - **Merge strategy:** Config values override defaults, missing values use defaults
 - **Data structure:** Flat struct for existing keys + nested TicketConfig struct for `[ticket]` section
 - **Backward compat:** Flat keys unchanged; `[ticket]` section optional with `#[serde(default)]`
+
+### count.rs
+- **Algorithm:** For each `[[count_check]]` entry: resolve doc path → read → regex extract first capture → parse u64 → spawn subprocess (`sh -c "{command}"` Unix, `cmd /C` Windows) → on success regex extract first capture from stdout → parse u64 → compare.
+- **Path resolution:** Try absolute → `docs_dir/file` → repo root (CWD). First existing wins.
+- **Error surface:** Every failure mode returns a Fail CheckResult with a precise reason. No panics for user-supplied regex.
+- **Subprocess trust:** User opts in via config; same trust model as git hooks. No timeout, no whitelist. Document in README.
+- **Complexity:** O(file size + command runtime) per entry.
+- **KHÔNG handle:** Multi-capture comparison. Floating-point numbers. Command timeout. Streaming stdout (waits for completion).
+
+### cross_doc.rs
+- **Algorithm:** For each `[[cross_doc]]` entry: resolve source + target paths → read both → compile both regexes → collect HashSet<String> of capture group 1 from each → compute `source ∖ target` → if empty pass, else fail with sorted list capped at 5 with " and N more".
+- **Direction:** Subset relationship. Target ⊇ Source. Target may have extra values.
+- **Empty source:** Returns Warn (likely user regex error, not real drift). Empty target with non-empty source → Fail (genuine missing values).
+- **Comparison:** Exact string match. Use `(?i)` in regex for case-insensitive needs.
+- **Complexity:** O(n + m) where n, m = source and target file sizes.
+- **KHÔNG handle:** Bidirectional checks. Fuzzy matching. Multi-capture-group comparison.
 
 ### mcp/server.rs + mcp/tools.rs
 - **Architecture:** DocsGateServer struct holds `config_path: Option<PathBuf>` (NOT a parsed Config) + ToolRouter. #[tool_router] macro generates routing from tool name to handler method.
@@ -360,3 +428,13 @@ Không có file config → dùng defaults. Mọi option đều optional.
 - **Modules liên quan:** checks/architecture.rs
 - **Vấn đề:** Doc structure check dùng cùng regex `^## \d+\.` như architecture. Doc files dùng heading style khác (vd: `## A. Section`, không có số) sẽ không được parse.
 - **Xử lý hiện tại:** Document rõ. Pattern này phù hợp với conventions của project Vietnamese (PROJECT.md, ARCHITECTURE.md numbered sections).
+
+### `[[count_check]]` runs arbitrary shell commands
+- **Modules liên quan:** checks/count.rs
+- **Vấn đề:** Command từ config chạy qua `sh -c` (Unix) / `cmd /C` (Windows). User có quyền sửa config = quyền chạy bất kỳ command nào. Không sandbox, không whitelist.
+- **Xử lý hiện tại:** Trust model giống git hooks: ai sửa được `.docs-gate.toml` đã có quyền code execution rồi. Document rõ trong README. KHÔNG sandbox vì sandboxing 1 dev tool đem lại an toàn giả.
+
+### `[[count_check]]` không có timeout
+- **Modules liên quan:** checks/count.rs
+- **Vấn đề:** Command hang sẽ làm docs-gate treo. Không có timeout.
+- **Xử lý hiện tại:** Chấp nhận. Dev tool, user Ctrl+C được. Có thể thêm config timeout ở phase sau nếu cần.

@@ -23,6 +23,14 @@ pub struct Config {
     /// `[architecture]` against the named file under `docs_dir`.
     #[serde(default, rename = "doc_structure")]
     pub doc_structure: Vec<DocStructureConfig>,
+    /// Drift checks: extract a number from a doc, run a command, compare the
+    /// command's output to the doc. Catches stale claims like "258/258 tests pass".
+    #[serde(default, rename = "count_check")]
+    pub count_check: Vec<CountCheckConfig>,
+    /// Cross-doc consistency: target file must contain every value extracted from
+    /// the source file. Catches drift between two docs that should agree.
+    #[serde(default, rename = "cross_doc")]
+    pub cross_doc: Vec<CrossDocConfig>,
 }
 
 fn default_true() -> bool {
@@ -57,6 +65,37 @@ fn default_max_commits() -> u32 {
 
 fn default_warn() -> String {
     String::from("warn")
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct CountCheckConfig {
+    /// Doc file containing the hardcoded number. Resolved against `docs_dir` first,
+    /// then against the project root.
+    pub file: String,
+    /// Regex with one capture group to extract the number from the doc
+    pub doc_pattern: String,
+    /// Shell command to run for the actual count
+    pub command: String,
+    /// Regex with one capture group to extract the number from command stdout
+    pub command_pattern: String,
+    /// Human-readable label shown in error messages (e.g. "test count")
+    #[serde(default)]
+    pub description: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct CrossDocConfig {
+    /// Source doc — declares the canonical set of values
+    pub source: String,
+    /// Regex with one capture group; all matches in source = canonical set
+    pub source_pattern: String,
+    /// Target doc — must contain every value from source
+    pub target: String,
+    /// Regex with one capture group; all matches in target = "what target has"
+    pub target_pattern: String,
+    /// Human-readable label shown in error messages
+    #[serde(default)]
+    pub description: String,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -100,6 +139,8 @@ impl Default for Config {
             rules: Vec::new(),
             staleness: Vec::new(),
             doc_structure: Vec::new(),
+            count_check: Vec::new(),
+            cross_doc: Vec::new(),
         }
     }
 }

@@ -28,6 +28,8 @@ pub fn scan_project(root: &Path) -> Config {
         rules: Vec::new(),
         staleness: Vec::new(),
         doc_structure: Vec::new(),
+        count_check: Vec::new(),
+        cross_doc: Vec::new(),
     }
 }
 

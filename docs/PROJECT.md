@@ -31,6 +31,8 @@ Chạy như git hook hoặc standalone. Viết bằng Rust, single binary, zero 
 | Watch mode (re-check on file change) | ✅ | 3 |
 | MCP server config hot-reload | ✅ | 5 |
 | `[[doc_structure]]`: required sections cho N file | ✅ | 5 |
+| `[[count_check]]`: drift số liệu (doc vs command output) | ✅ | 5 |
+| `[[cross_doc]]`: token consistency giữa 2 doc files | ✅ | 5 |
 
 ## Target Users
 
@@ -45,7 +47,7 @@ Chạy như git hook hoặc standalone. Viết bằng Rust, single binary, zero 
 | 2 | Extended checks: Discovery Report, phiếu format | ✅ |
 | 3 | MCP server + watch mode | ✅ |
 | 4 | Open source release (README, CI/CD, cargo install) | ✅ |
-| 5 | Coverage extensions: MCP hot-reload + generic doc structure | ✅ (P5-1, P5-2) |
+| 5 | Coverage extensions: MCP hot-reload + generic doc structure + drift checks | ✅ (P5-1 → P5-4) |
 
 ## Constraints
 

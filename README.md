@@ -103,9 +103,33 @@ required_non_empty = [1, 2, 3]
 [[doc_structure]]
 file = "AUDIT_PROTOCOL.md"
 required_sections = 6
+
+# Optional: catch drift between a number claimed in a doc and an actual count
+# from a command. Each entry runs `command` via the system shell, so docs-gate
+# only checks projects whose contributors are already trusted to run code.
+[[count_check]]
+file = "CLAUDE.md"
+doc_pattern = '(\d+)/\d+ tests pass'
+command = "cargo test 2>&1 | grep 'test result'"
+command_pattern = 'test result: ok\. (\d+) passed'
+description = "test count"
+
+# Optional: assert every value extracted from `source` also appears in `target`.
+# Useful for keeping two docs in sync (e.g. PROJECT.md phases ↔ CLAUDE.md).
+[[cross_doc]]
+source = "PROJECT.md"
+source_pattern = '\| Phase ([0-9]+) '
+target = "CLAUDE.md"
+target_pattern = 'Phase ([0-9]+) '
+description = "Phase numbers consistency"
 ```
 
 All fields are optional. Without a config file, sensible defaults apply.
+
+> **Security note:** `[[count_check]]` executes `command` via `sh -c` (Unix) or
+> `cmd /C` (Windows). Anyone who can edit `.docs-gate.toml` can run arbitrary
+> shell commands when checks fire. Treat it like a git hook — fine for trusted
+> contributors, do not enable on configs you have not reviewed.
 
 ## MCP server
 

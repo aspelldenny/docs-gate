@@ -1,5 +1,28 @@
 # CHANGELOG
 
+## [#5-3 + #5-4] `[[count_check]]` (drift) + `[[cross_doc]]` (consistency) — 2026-04-26
+- Phiếu #5-3: `[[count_check]]` config array — catch stale numeric claims in docs
+  - Each entry: extract a number from a doc via `doc_pattern`, run `command`,
+    parse stdout via `command_pattern`, fail on mismatch
+  - New module `src/checks/count.rs` with `check_counts(&Config)`
+  - Subprocess execution via `sh -c` on Unix, `cmd /C` on Windows
+  - New `CountCheckConfig { file, doc_pattern, command, command_pattern, description }`
+  - Resolves `file` against `docs_dir` first, then repo root (CWD)
+  - 8 new tests: empty/match/mismatch/missing-file/non-zero-exit/no-doc-match/no-cmd-match/invalid-regex
+- Phiếu #5-4: `[[cross_doc]]` config array — catch token drift between two docs
+  - Each entry: extract values from `source` via `source_pattern`, verify they
+    all appear in `target` via `target_pattern` (subset relationship)
+  - New module `src/checks/cross_doc.rs` with `check_cross_doc(&Config)`
+  - Pure regex + file read — no subprocess
+  - New `CrossDocConfig { source, source_pattern, target, target_pattern, description }`
+  - Source pattern matching nothing → Warn (likely user regex error, not drift)
+  - Missing values list capped at 5 with " and N more" suffix
+  - 7 new tests: empty/pass-subset/fail-missing/source-pattern-no-match/source-missing/target-missing/invalid-regex/list-truncation
+- Both checks no-op when their config arrays are empty (default).
+- `run_all_checks` now calls `count::check_counts` and `cross_doc::check_cross_doc` after the staged checks.
+- README: added `[[count_check]]` and `[[cross_doc]]` examples plus a security note about subprocess execution.
+- Total: 115 tests (95 unit + 11 CLI integration + 9 MCP integration), up from 99.
+
 ## [#5-1 + #5-2] MCP config hot-reload + generic `[[doc_structure]]` — 2026-04-26
 - Phiếu #5-1: MCP server now reloads `.docs-gate.toml` on every tool call instead of
   caching at startup. Editing config no longer requires restarting the MCP server.
