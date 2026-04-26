@@ -154,3 +154,4 @@ Phase 1 (MVP CLI) ✅ HOÀN THÀNH
 Phase 2 (Discovery Report + Ticket Check) ✅ HOÀN THÀNH
 Phase 3 (MCP server + watch mode) ✅ HOÀN THÀNH
 Phase 4 (Open source release) ✅ HOÀN THÀNH
+Phase 5 (Coverage extensions: MCP hot-reload + `[[doc_structure]]`) ✅ HOÀN THÀNH (P5-1, P5-2)

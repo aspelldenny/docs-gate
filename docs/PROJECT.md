@@ -29,6 +29,8 @@ Chạy như git hook hoặc standalone. Viết bằng Rust, single binary, zero 
 | Check phiếu có type classification | ✅ | 2 |
 | MCP server mode | ✅ | 3 |
 | Watch mode (re-check on file change) | ✅ | 3 |
+| MCP server config hot-reload | ✅ | 5 |
+| `[[doc_structure]]`: required sections cho N file | ✅ | 5 |
 
 ## Target Users
 
@@ -43,6 +45,7 @@ Chạy như git hook hoặc standalone. Viết bằng Rust, single binary, zero 
 | 2 | Extended checks: Discovery Report, phiếu format | ✅ |
 | 3 | MCP server + watch mode | ✅ |
 | 4 | Open source release (README, CI/CD, cargo install) | ✅ |
+| 5 | Coverage extensions: MCP hot-reload + generic doc structure | ✅ (P5-1, P5-2) |
 
 ## Constraints
 

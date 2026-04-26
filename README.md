@@ -91,6 +91,18 @@ changelog_max_age_days = 1
 ticket_dir = "docs/ticket"
 valid_types = ["read-only", "mutating", "destructive"]
 exclude_files = ["TEMPLATE.md"]
+
+# Optional: enforce structure on additional doc files beyond ARCHITECTURE.md.
+# Each [[doc_structure]] entry runs the same section-count + required-non-empty
+# checks against the named file under docs_dir.
+[[doc_structure]]
+file = "TEST_CASES.md"
+required_sections = 3
+required_non_empty = [1, 2, 3]
+
+[[doc_structure]]
+file = "AUDIT_PROTOCOL.md"
+required_sections = 6
 ```
 
 All fields are optional. Without a config file, sensible defaults apply.

@@ -1,19 +1,18 @@
+use std::path::Path;
+
 use crate::checks::{CheckResult, CheckStatus};
 use crate::config::Config;
 
-pub fn check_architecture(config: &Config) -> Vec<CheckResult> {
-    let name_prefix = "architecture";
-
-    if !config.architecture.enabled {
-        return vec![CheckResult {
-            name: String::from(name_prefix),
-            status: CheckStatus::Pass,
-        }];
-    }
-
-    let path = config.docs_dir.join(&config.architecture.file);
-
-    let content = match std::fs::read_to_string(&path) {
+/// Generic structural check: read a markdown file, count `## N.` headings, and
+/// verify the requested sections are present and non-empty. Used by both the
+/// `[architecture]` check and the `[[doc_structure]]` array.
+pub fn check_doc_file(
+    path: &Path,
+    required_sections: usize,
+    required_non_empty: &[usize],
+    name_prefix: &str,
+) -> Vec<CheckResult> {
+    let content = match std::fs::read_to_string(path) {
         Ok(c) => c,
         Err(_) => {
             return vec![CheckResult {
@@ -26,8 +25,7 @@ pub fn check_architecture(config: &Config) -> Vec<CheckResult> {
     let re_section = regex::Regex::new(r"^## (\d+)\.").unwrap();
     let lines: Vec<&str> = content.lines().collect();
 
-    // Collect section positions and numbers
-    let mut sections: Vec<(usize, usize)> = Vec::new(); // (line_idx, section_number)
+    let mut sections: Vec<(usize, usize)> = Vec::new();
     for (i, line) in lines.iter().enumerate() {
         if let Some(caps) = re_section.captures(line)
             && let Ok(num) = caps[1].parse::<usize>()
@@ -38,16 +36,14 @@ pub fn check_architecture(config: &Config) -> Vec<CheckResult> {
 
     let mut results = Vec::new();
 
-    // Check total section count
     let unique_sections: std::collections::HashSet<usize> =
         sections.iter().map(|(_, n)| *n).collect();
     let found = unique_sections.len();
-    let required = config.architecture.required_sections;
 
-    if found < required {
+    if found < required_sections {
         results.push(CheckResult {
             name: format!("{name_prefix}-section-count"),
-            status: CheckStatus::Fail(format!("Found {found}/{required} sections")),
+            status: CheckStatus::Fail(format!("Found {found}/{required_sections} sections")),
         });
     } else {
         results.push(CheckResult {
@@ -56,8 +52,7 @@ pub fn check_architecture(config: &Config) -> Vec<CheckResult> {
         });
     }
 
-    // Check required non-empty sections
-    for &section_num in &config.architecture.required_non_empty {
+    for &section_num in required_non_empty {
         let section_pos = sections.iter().find(|(_, n)| *n == section_num);
 
         match section_pos {
@@ -96,6 +91,42 @@ pub fn check_architecture(config: &Config) -> Vec<CheckResult> {
         }
     }
 
+    results
+}
+
+pub fn check_architecture(config: &Config) -> Vec<CheckResult> {
+    let name_prefix = "architecture";
+
+    if !config.architecture.enabled {
+        return vec![CheckResult {
+            name: String::from(name_prefix),
+            status: CheckStatus::Pass,
+        }];
+    }
+
+    let path = config.docs_dir.join(&config.architecture.file);
+    check_doc_file(
+        &path,
+        config.architecture.required_sections,
+        &config.architecture.required_non_empty,
+        name_prefix,
+    )
+}
+
+/// Run `check_doc_file` for every `[[doc_structure]]` entry in config. Returns
+/// an empty vec when no entries are configured (default).
+pub fn check_doc_structure(config: &Config) -> Vec<CheckResult> {
+    let mut results = Vec::new();
+    for entry in &config.doc_structure {
+        let path = config.docs_dir.join(&entry.file);
+        let prefix = format!("doc-{}", entry.file);
+        results.extend(check_doc_file(
+            &path,
+            entry.required_sections,
+            &entry.required_non_empty,
+            &prefix,
+        ));
+    }
     results
 }
 
@@ -262,6 +293,142 @@ mod tests {
             results
                 .iter()
                 .all(|r| matches!(r.status, CheckStatus::Pass))
+        );
+    }
+
+    fn write_named(dir: &std::path::Path, name: &str, content: &str) {
+        let path = dir.join(name);
+        let mut f = std::fs::File::create(path).unwrap();
+        write!(f, "{content}").unwrap();
+    }
+
+    fn three_sections() -> String {
+        let mut s = String::from("# DOC\n\n");
+        for i in 1..=3 {
+            s.push_str(&format!("## {i}. Section {i}\n\nContent {i}.\n\n"));
+        }
+        s
+    }
+
+    #[test]
+    fn test_doc_structure_empty_returns_no_results() {
+        let config = Config::default();
+        assert!(check_doc_structure(&config).is_empty());
+    }
+
+    #[test]
+    fn test_doc_structure_single_entry_pass() {
+        let dir = tempfile::tempdir().unwrap();
+        write_named(dir.path(), "TEST_CASES.md", &three_sections());
+        let config = Config {
+            docs_dir: dir.path().to_path_buf(),
+            doc_structure: vec![crate::config::DocStructureConfig {
+                file: "TEST_CASES.md".into(),
+                required_sections: 3,
+                required_non_empty: vec![1, 2, 3],
+            }],
+            ..Config::default()
+        };
+        let results = check_doc_structure(&config);
+        assert!(
+            results
+                .iter()
+                .all(|r| matches!(r.status, CheckStatus::Pass)),
+            "{results:?}"
+        );
+        assert!(
+            results
+                .iter()
+                .all(|r| r.name.starts_with("doc-TEST_CASES.md"))
+        );
+    }
+
+    #[test]
+    fn test_doc_structure_multiple_entries_independent() {
+        let dir = tempfile::tempdir().unwrap();
+        write_named(dir.path(), "A.md", &three_sections());
+        // B.md only has 2 sections — should fail count check
+        let mut b = String::from("# B\n\n");
+        for i in 1..=2 {
+            b.push_str(&format!("## {i}. Section\n\nContent.\n\n"));
+        }
+        write_named(dir.path(), "B.md", &b);
+        let config = Config {
+            docs_dir: dir.path().to_path_buf(),
+            doc_structure: vec![
+                crate::config::DocStructureConfig {
+                    file: "A.md".into(),
+                    required_sections: 3,
+                    required_non_empty: vec![],
+                },
+                crate::config::DocStructureConfig {
+                    file: "B.md".into(),
+                    required_sections: 3,
+                    required_non_empty: vec![],
+                },
+            ],
+            ..Config::default()
+        };
+        let results = check_doc_structure(&config);
+        let a = results
+            .iter()
+            .find(|r| r.name == "doc-A.md-section-count")
+            .unwrap();
+        let b = results
+            .iter()
+            .find(|r| r.name == "doc-B.md-section-count")
+            .unwrap();
+        assert!(matches!(a.status, CheckStatus::Pass));
+        assert!(matches!(b.status, CheckStatus::Fail(_)));
+    }
+
+    #[test]
+    fn test_doc_structure_missing_file_fails() {
+        let dir = tempfile::tempdir().unwrap();
+        let config = Config {
+            docs_dir: dir.path().to_path_buf(),
+            doc_structure: vec![crate::config::DocStructureConfig {
+                file: "NONEXISTENT.md".into(),
+                required_sections: 1,
+                required_non_empty: vec![],
+            }],
+            ..Config::default()
+        };
+        let results = check_doc_structure(&config);
+        assert_eq!(results.len(), 1);
+        assert!(
+            matches!(results[0].status, CheckStatus::Fail(ref s) if s.starts_with("File not found"))
+        );
+        assert_eq!(results[0].name, "doc-NONEXISTENT.md");
+    }
+
+    #[test]
+    fn test_doc_structure_does_not_collide_with_architecture() {
+        // Both [architecture] and [[doc_structure]] target the same file —
+        // results should be distinct (different name prefixes).
+        let dir = tempfile::tempdir().unwrap();
+        write_arch(dir.path(), &full_9_sections());
+        let config = Config {
+            docs_dir: dir.path().to_path_buf(),
+            doc_structure: vec![crate::config::DocStructureConfig {
+                file: "ARCHITECTURE.md".into(),
+                required_sections: 9,
+                required_non_empty: vec![],
+            }],
+            ..Config::default()
+        };
+        let arch_results = check_architecture(&config);
+        let doc_results = check_doc_structure(&config);
+        assert!(arch_results.iter().any(|r| r.name.starts_with("architecture")));
+        assert!(
+            doc_results
+                .iter()
+                .any(|r| r.name.starts_with("doc-ARCHITECTURE.md"))
+        );
+        assert!(
+            !doc_results
+                .iter()
+                .any(|r| r.name.starts_with("architecture"))
         );
     }
 }

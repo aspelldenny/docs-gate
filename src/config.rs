@@ -18,6 +18,11 @@ pub struct Config {
     /// Staleness checks: warn when a file hasn't been updated in N commits
     #[serde(default)]
     pub staleness: Vec<StalenessConfig>,
+    /// Generic structural checks for additional doc files (beyond ARCHITECTURE.md).
+    /// Each entry runs the same section-count + required-non-empty logic as
+    /// `[architecture]` against the named file under `docs_dir`.
+    #[serde(default, rename = "doc_structure")]
+    pub doc_structure: Vec<DocStructureConfig>,
 }
 
 fn default_true() -> bool {
@@ -54,6 +59,17 @@ fn default_warn() -> String {
     String::from("warn")
 }
 
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct DocStructureConfig {
+    /// Path to doc file relative to `docs_dir` (e.g. "TEST_CASES.md")
+    pub file: String,
+    /// Number of `## N.` headings required
+    pub required_sections: usize,
+    /// 1-indexed section numbers that must be non-empty
+    #[serde(default)]
+    pub required_non_empty: Vec<usize>,
+}
+
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(default)]
 pub struct ArchitectureConfig {
@@ -83,6 +99,7 @@ impl Default for Config {
             changelog_staged: true,
             rules: Vec::new(),
             staleness: Vec::new(),
+            doc_structure: Vec::new(),
         }
     }
 }
@@ -240,6 +257,40 @@ mod tests {
             config.ticket.valid_types,
             vec!["read-only", "mutating", "destructive"]
         );
+    }
+
+    #[test]
+    fn test_load_config_with_doc_structure() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join(".docs-gate.toml");
+        let mut f = std::fs::File::create(&path).unwrap();
+        writeln!(f, "[[doc_structure]]").unwrap();
+        writeln!(f, "file = \"TEST_CASES.md\"").unwrap();
+        writeln!(f, "required_sections = 3").unwrap();
+        writeln!(f, "required_non_empty = [1, 2, 3]").unwrap();
+        writeln!(f).unwrap();
+        writeln!(f, "[[doc_structure]]").unwrap();
+        writeln!(f, "file = \"AUDIT_PROTOCOL.md\"").unwrap();
+        writeln!(f, "required_sections = 6").unwrap();
+
+        let config = load_config(Some(&path));
+        assert_eq!(config.doc_structure.len(), 2);
+        assert_eq!(config.doc_structure[0].file, "TEST_CASES.md");
+        assert_eq!(config.doc_structure[0].required_sections, 3);
+        assert_eq!(config.doc_structure[0].required_non_empty, vec![1, 2, 3]);
+        assert_eq!(config.doc_structure[1].file, "AUDIT_PROTOCOL.md");
+        assert_eq!(config.doc_structure[1].required_sections, 6);
+        assert!(config.doc_structure[1].required_non_empty.is_empty());
+    }
+
+    #[test]
+    fn test_load_config_no_doc_structure_defaults_empty() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join(".docs-gate.toml");
+        std::fs::write(&path, "docs_dir = \"docs\"\n").unwrap();
+
+        let config = load_config(Some(&path));
+        assert!(config.doc_structure.is_empty());
     }
 
     #[test]

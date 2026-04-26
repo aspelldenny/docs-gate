@@ -1,5 +1,24 @@
 # CHANGELOG
 
+## [#5-1 + #5-2] MCP config hot-reload + generic `[[doc_structure]]` — 2026-04-26
+- Phiếu #5-1: MCP server now reloads `.docs-gate.toml` on every tool call instead of
+  caching at startup. Editing config no longer requires restarting the MCP server.
+  - `DocsGateServer` now holds `Option<PathBuf>` (config path) instead of cached `Config`
+  - `resolve_config(Config, Option<String>)` takes ownership of the freshly-loaded config
+  - `main.rs Serve` branch passes `cli.config` (path) instead of parsed `Config`
+  - New unit test: `test_load_fresh_config_picks_up_edits` verifies hot-reload contract
+- Phiếu #5-2: `[[doc_structure]]` config array — enforce required sections on N doc files
+  - New `DocStructureConfig { file, required_sections, required_non_empty }`
+  - New `Config.doc_structure: Vec<DocStructureConfig>` (empty by default)
+  - Refactored `architecture::check_architecture` to delegate to new helper
+    `check_doc_file(path, required_sections, required_non_empty, name_prefix)`
+  - New `architecture::check_doc_structure(&Config)` iterates entries
+  - `run_all_checks` now also calls `check_doc_structure` (no-op when empty)
+  - Backward compat: `[architecture]` section unchanged; existing configs work as-is
+  - MCP `check_architecture` tool unchanged (still ARCHITECTURE.md only); `check_all` picks up new entries
+  - 7 new tests: doc_structure empty/single/multiple/missing-file/no-collision-with-architecture + 2 config-loading tests
+- Total: 99 tests (79 unit + 11 CLI integration + 9 MCP integration)
+
 ## [init] Flexible config: `docs-gate init` + configurable checks — 2026-04-02
 - New subcommand: `docs-gate init` — scans project, auto-generates `.docs-gate.toml`
   - Detects docs dir, changelog, architecture file, ticket dir

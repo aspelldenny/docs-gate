@@ -42,19 +42,23 @@ pub async fn run_watch(config: &Config, extended: bool) -> ExitCode
   // Run checks, setup notify watcher, debounce 500ms, re-run on changes, Ctrl+C exit
 
 // mcp/server.rs
-pub struct DocsGateServer { config: Config, tool_router: ToolRouter<Self> }
-impl DocsGateServer { pub fn new(config: Config) -> Self }
+pub struct DocsGateServer { config_path: Option<PathBuf>, tool_router: ToolRouter<Self> }
+impl DocsGateServer {
+    pub fn new(config_path: Option<PathBuf>) -> Self
+    fn load_fresh_config(&self) -> Config  // reloads .docs-gate.toml each call
+}
 impl ServerHandler for DocsGateServer { fn get_info(&self) -> ServerInfo }
 // Tools (via #[tool_router] + #[tool] macros):
 //   check_changelog(DocsDirParam) -> Json<Vec<CheckResult>>
 //   check_architecture(DocsDirParam) -> Json<Vec<CheckResult>>
 //   check_discovery(FilePathParam) -> Json<Vec<CheckResult>>
+//   check_staged(DocsDirParam) -> Json<Vec<CheckResult>>
 //   check_all(DocsDirParam) -> Json<Vec<CheckResult>>
 
 // mcp/tools.rs
 pub struct DocsDirParam { pub docs_dir: Option<String> }
 pub struct FilePathParam { pub file_path: String }
-pub fn resolve_config(base: &Config, docs_dir: Option<String>) -> Config
+pub fn resolve_config(config: Config, docs_dir: Option<String>) -> Config  // takes by value (fresh per call)
 
 // config.rs
 pub struct Config {
@@ -63,12 +67,21 @@ pub struct Config {
     pub changelog_max_age_days: u32,    // default: 1
     pub architecture: ArchitectureConfig,
     pub ticket: TicketConfig,
+    pub changelog_staged: bool,         // default: true
+    pub rules: Vec<RuleConfig>,         // default: []
+    pub staleness: Vec<StalenessConfig>,// default: []
+    pub doc_structure: Vec<DocStructureConfig>, // default: [] — extra structural checks
 }
 pub struct ArchitectureConfig {
     pub enabled: bool,                  // default: true — set false to skip
     pub file: String,                   // default: "ARCHITECTURE.md"
     pub required_sections: usize,       // default: 9
     pub required_non_empty: Vec<usize>, // default: [7, 8, 9]
+}
+pub struct DocStructureConfig {
+    pub file: String,                   // path relative to docs_dir
+    pub required_sections: usize,
+    pub required_non_empty: Vec<usize>, // default: []
 }
 pub struct TicketConfig {
     pub ticket_dir: PathBuf,            // default: "docs/ticket"
@@ -92,7 +105,9 @@ pub fn run_all_checks_extended(config: &Config) -> Vec<CheckResult>
 pub fn check_changelog(config: &Config) -> CheckResult
 
 // checks/architecture.rs
+pub fn check_doc_file(path: &Path, required_sections: usize, required_non_empty: &[usize], name_prefix: &str) -> Vec<CheckResult>
 pub fn check_architecture(config: &Config) -> Vec<CheckResult>
+pub fn check_doc_structure(config: &Config) -> Vec<CheckResult>  // iterates [[doc_structure]] entries
 
 // checks/discovery.rs
 pub fn check_discovery(file_path: &Path) -> Vec<CheckResult>
@@ -123,10 +138,11 @@ CLI args (clap)
     │   → write_config() → .docs-gate.toml
     │   → print summary to stderr, config to stdout
     ├─ serve:
-    │   → DocsGateServer::new(config)
+    │   → DocsGateServer::new(cli.config)  // pass config PATH, not parsed Config
     │   → server.serve(rmcp::transport::stdio())
     │   → MCP JSON-RPC loop on stdin/stdout
-    │   → Client calls tool → route to check function → return JSON CheckResult(s)
+    │   → Client calls tool → load_fresh_config() reloads .docs-gate.toml from disk
+    │   → resolve_config(fresh, override) → run checks → return JSON CheckResult(s)
     │   → Client disconnect → clean exit
     ├─ --watch:
     │   → run_watch(config, extended)
@@ -146,9 +162,12 @@ CLI args (clap)
         → run_all_checks(config)
           ├─ check_changelog()
           │   → Read file → find entries → check date/content
-          └─ check_architecture()
-              → Read file → parse ## headings → count sections
-              → Check sections 7,8,9 not empty
+          ├─ check_architecture()
+          │   → Read file → parse ## headings → count sections
+          │   → Check sections 7,8,9 not empty
+          └─ check_doc_structure()
+              → For each [[doc_structure]] entry: same logic as architecture
+              → No-op when array is empty (default)
         → format_results() → stdout
         → exit_code() → 0 (all pass) hoặc 1 (any fail)
 ```
@@ -172,9 +191,13 @@ File: `.docs-gate.toml` (project root, optional)
 | `[ticket].type_pattern` | String? | `"\\*\\*Type:\\*\\*..."` | Regex cho type field (null = skip) |
 | `[ticket].valid_types` | Array<String> | `["read-only", "mutating", "destructive"]` | Các type hợp lệ |
 | `[ticket].exclude_files` | Array<String> | `["TEMPLATE.md"]` | Files bỏ qua khi scan |
+| `[[doc_structure]].file` | String | (none) | Path tới doc file cần check structure (relative docs_dir) |
+| `[[doc_structure]].required_sections` | u32 | (none) | Số sections bắt buộc cho file đó |
+| `[[doc_structure]].required_non_empty` | Array<u32> | `[]` | Sections phải có content |
 
 Không có file config → dùng defaults. Mọi option đều optional.
 `docs-gate init` scan project → auto-generate `.docs-gate.toml` phù hợp.
+`[[doc_structure]]` là array — dùng nhiều entries để check nhiều file.
 
 ---
 
@@ -224,6 +247,8 @@ Không có file config → dùng defaults. Mọi option đều optional.
 - **"Non-empty" check:** Section content (between 2 headings) có >= 1 non-comment, non-whitespace line
 - **Comment detection:** Lines starting with `<!--` ignored (template comments)
 - **Complexity:** O(n) single pass
+- **Generic helper:** `check_doc_file(path, required_sections, required_non_empty, name_prefix)` — extract logic ra dùng chung. `check_architecture` và `check_doc_structure` đều gọi helper này.
+- **doc_structure:** `check_doc_structure` iterate `config.doc_structure: Vec<DocStructureConfig>` — mỗi entry chạy helper với `name_prefix = "doc-{file}"` để tránh trùng tên với architecture results.
 - **KHÔNG handle:** Nested subsections (### ) — chỉ count top-level ## sections
 
 ### discovery.rs
@@ -254,13 +279,14 @@ Không có file config → dùng defaults. Mọi option đều optional.
 - **Backward compat:** Flat keys unchanged; `[ticket]` section optional with `#[serde(default)]`
 
 ### mcp/server.rs + mcp/tools.rs
-- **Architecture:** DocsGateServer struct holds Config + ToolRouter. #[tool_router] macro generates routing from tool name to handler method.
-- **Tools:** 4 tools exposed via #[tool] macro. Each tool calls existing sync check functions directly — no logic duplication.
-- **Parameter resolution:** DocsDirParam.docs_dir overrides Config.docs_dir if provided, otherwise uses config default. Config object is cloned per-call, not modified.
+- **Architecture:** DocsGateServer struct holds `config_path: Option<PathBuf>` (NOT a parsed Config) + ToolRouter. #[tool_router] macro generates routing from tool name to handler method.
+- **Tools:** 5 tools exposed via #[tool] macro. Each tool calls existing sync check functions directly — no logic duplication.
+- **Hot-reload:** Each tool call invokes `self.load_fresh_config()` which calls `config::load_config(self.config_path.as_deref())` — re-reads `.docs-gate.toml` from disk every call. Editing the config no longer requires restarting the server.
+- **Parameter resolution:** `resolve_config(Config, Option<String>)` takes the freshly-loaded config by value and applies the optional `docs_dir` override. No cloning needed — caller already owns a fresh Config.
 - **Return format:** All tools return Json<Vec<CheckResult>> — rmcp serializes to JSON text content in MCP response.
 - **Transport:** stdio only. stdout = JSON-RPC channel. All logs/errors → stderr.
-- **Lifecycle:** Config loaded once at startup. Server runs until client disconnect.
-- **KHÔNG handle:** Hot-reload config. HTTP/SSE transport. Resources or prompts (tools only).
+- **Lifecycle:** Config path captured at startup; config content read fresh per call. Server runs until client disconnect.
+- **KHÔNG handle:** HTTP/SSE transport. Resources or prompts (tools only).
 
 ### watch.rs
 - **Algorithm:** Run checks once → setup notify RecommendedWatcher on docs_dir (+ ticket_dir if extended) → event loop with tokio::select! between file events and Ctrl+C signal
@@ -290,7 +316,7 @@ Không có file config → dùng defaults. Mọi option đều optional.
   - Terminal: clear + timestamp before each re-run
   - Exit code: last check run's exit code
 - **Serve mode (serve):** Long-running MCP server on stdio. JSON-RPC on stdin/stdout. Logs on stderr.
-  - Config loaded once at startup, no hot-reload
+  - Config path captured at startup; `.docs-gate.toml` re-read on every tool call (hot-reload)
   - Server exits when client disconnects
   - serve + --watch → error exit 2
 - **Signal handling:** tokio::signal::ctrl_c() cho watch mode clean exit
@@ -330,7 +356,7 @@ Không có file config → dùng defaults. Mọi option đều optional.
 - **Vấn đề:** Chỉ hỗ trợ stdio transport. Không SSE, không HTTP.
 - **Xử lý hiện tại:** Đủ cho Claude Desktop/Code integration. Network transport ngoài scope.
 
-### MCP server no config hot-reload
-- **Modules liên quan:** mcp/server.rs
-- **Vấn đề:** Config loaded 1 lần lúc startup. Thay đổi .docs-gate.toml cần restart server.
-- **Xử lý hiện tại:** Chấp nhận. MCP clients sẽ restart server khi cần.
+### `[[doc_structure]]` reuses architecture parser
+- **Modules liên quan:** checks/architecture.rs
+- **Vấn đề:** Doc structure check dùng cùng regex `^## \d+\.` như architecture. Doc files dùng heading style khác (vd: `## A. Section`, không có số) sẽ không được parse.
+- **Xử lý hiện tại:** Document rõ. Pattern này phù hợp với conventions của project Vietnamese (PROJECT.md, ARCHITECTURE.md numbered sections).

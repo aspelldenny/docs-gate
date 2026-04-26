@@ -26,6 +26,8 @@ pub fn run_all_checks(config: &Config) -> Vec<CheckResult> {
     let mut results = Vec::new();
     results.push(changelog::check_changelog(config));
     results.extend(architecture::check_architecture(config));
+    // Generic structural checks for additional doc files (no-op when [[doc_structure]] is empty)
+    results.extend(architecture::check_doc_structure(config));
     // Git-aware checks: staged changelog + file-to-docs rules + staleness
     results.push(staged::check_changelog_staged(config));
     results.extend(staged::check_rules(config));

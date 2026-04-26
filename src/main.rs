@@ -105,7 +105,9 @@ async fn main() -> ExitCode {
             }
         }
         Some(Commands::Serve) => {
-            let server = mcp::server::DocsGateServer::new(config);
+            // Pass the config path (not the parsed Config) so the server reloads
+            // .docs-gate.toml on every tool call instead of caching at startup.
+            let server = mcp::server::DocsGateServer::new(cli.config.clone());
             let transport = rmcp::transport::stdio();
             match server.serve(transport).await {
                 Ok(running) => {

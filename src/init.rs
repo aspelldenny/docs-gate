@@ -27,6 +27,7 @@ pub fn scan_project(root: &Path) -> Config {
         changelog_staged: true,
         rules: Vec::new(),
         staleness: Vec::new(),
+        doc_structure: Vec::new(),
     }
 }
 
