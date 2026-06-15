@@ -173,7 +173,11 @@ mod tests {
     fn test_pass_when_target_contains_all_source_values() {
         let dir = tempfile::tempdir().unwrap();
         write_file(dir.path(), "SRC.md", "Phase 1\nPhase 2\nPhase 3\n");
-        write_file(dir.path(), "TGT.md", "Phase 1 done\nPhase 2 done\nPhase 3 done\nPhase 4 future\n");
+        write_file(
+            dir.path(),
+            "TGT.md",
+            "Phase 1 done\nPhase 2 done\nPhase 3 done\nPhase 4 future\n",
+        );
         let config = config_with(
             dir.path(),
             vec![CrossDocConfig {
@@ -186,7 +190,10 @@ mod tests {
         );
         let results = check_cross_doc(&config);
         assert_eq!(results.len(), 1);
-        assert!(matches!(results[0].status, CheckStatus::Pass), "{results:?}");
+        assert!(
+            matches!(results[0].status, CheckStatus::Pass),
+            "{results:?}"
+        );
         assert_eq!(results[0].name, "cross-phases");
     }
 
@@ -296,11 +303,7 @@ mod tests {
     #[test]
     fn test_missing_list_truncated_at_five() {
         let dir = tempfile::tempdir().unwrap();
-        write_file(
-            dir.path(),
-            "SRC.md",
-            "x:1\nx:2\nx:3\nx:4\nx:5\nx:6\nx:7\n",
-        );
+        write_file(dir.path(), "SRC.md", "x:1\nx:2\nx:3\nx:4\nx:5\nx:6\nx:7\n");
         write_file(dir.path(), "TGT.md", "nothing\n");
         let config = config_with(
             dir.path(),

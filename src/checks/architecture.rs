@@ -419,7 +419,11 @@ mod tests {
         };
         let arch_results = check_architecture(&config);
         let doc_results = check_doc_structure(&config);
-        assert!(arch_results.iter().any(|r| r.name.starts_with("architecture")));
+        assert!(
+            arch_results
+                .iter()
+                .any(|r| r.name.starts_with("architecture"))
+        );
         assert!(
             doc_results
                 .iter()

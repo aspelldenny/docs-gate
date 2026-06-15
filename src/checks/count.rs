@@ -224,7 +224,10 @@ mod tests {
         );
         let results = check_counts(&config);
         assert_eq!(results.len(), 1);
-        assert!(matches!(results[0].status, CheckStatus::Pass), "{results:?}");
+        assert!(
+            matches!(results[0].status, CheckStatus::Pass),
+            "{results:?}"
+        );
         assert_eq!(results[0].name, "count-items");
     }
 
@@ -282,7 +285,9 @@ mod tests {
             }],
         );
         let results = check_counts(&config);
-        assert!(matches!(results[0].status, CheckStatus::Fail(ref s) if s.contains("File not found")));
+        assert!(
+            matches!(results[0].status, CheckStatus::Fail(ref s) if s.contains("File not found"))
+        );
     }
 
     #[test]
