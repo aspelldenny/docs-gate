@@ -1,6 +1,6 @@
 [package]
 name = "docs-gate"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 description = "CLI tool to check docs compliance before commit — CHANGELOG, ARCHITECTURE, Discovery Reports"
 license = "MIT"
